@@ -1,4 +1,4 @@
-const CACHE='gb-cache-v2'; // bump this to bust old cache
+const CACHE='gb-cache-v3';
 const ASSETS=[
   './',
   './index.html',
