@@ -1,8 +1,9 @@
-const CACHE='gb-cache-v4';
+const CACHE='gb-cache-v5';
 const ASSETS=[
   './',
   './index.html',
   './style.css',
+  './boot.js',
   './app.js',
   './db.js',
   './theme.js',
@@ -15,7 +16,8 @@ const ASSETS=[
   './expense.html',
   './income.html',
   './about.html',
-  './recurring.html'
+  './recurring.html',
+  './history.html'
 ];
 self.addEventListener('install', (e)=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))); });
 self.addEventListener('activate', (e)=>{
