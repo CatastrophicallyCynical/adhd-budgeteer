@@ -1,15 +1,36 @@
+/* ------------------------------
+   Budgeteer – phone-first styles
+   Theme is controlled by body[data-theme="…"]
+   ------------------------------ */
+
+/* defaults (used when no theme is set) */
 :root{
-  /* App theme (overridden by saved theme via theme.js) */
-  --bg:#EAE4DC;        /* light brownish grey */
+  --bg:#EAE4DC;      /* soft brownish grey */
   --panel:#ffffff;
   --ink:#1f2937;
   --muted:#6b7280;
-
-  /* Accent */
   --brand:#3949AB;
 }
 
-/* ---- Base ---- */
+/* ------- Theme palettes (override vars) ------- */
+/* neutral */
+body[data-theme="white"]{ --bg:#ffffff; --panel:#ffffff; --ink:#111827; --muted:#6b7280 }
+body[data-theme="black"]{ --bg:#0b0b0b; --panel:#161616; --ink:#f9fafb; --muted:#a1a1aa }
+
+/* colorful options */
+body[data-theme="sky"]     { --bg:#E6F6FF; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="grass"]   { --bg:#e9f7ef; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="lemon"]   { --bg:#fff9db; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="coral"]   { --bg:#ffe8e2; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="lavender"]{ --bg:#f3e8ff; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="mint"]    { --bg:#e6fffb; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="sand"]    { --bg:#f6f1e6; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="slate"]   { --bg:#eef2f5; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="rose"]    { --bg:#fff0f5; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+body[data-theme="navy"], 
+body[data-theme="blue"]    { --bg:#e8ecff; --panel:#ffffff; --ink:#0f172a; --muted:#475569 }
+
+/* ---- Base layout ---- */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -20,6 +41,7 @@ body{
   padding-bottom:84px; /* keep content above the tab bar */
 }
 
+/* Header */
 header{
   position:sticky; top:0; z-index:3;
   background:var(--panel);
@@ -29,6 +51,7 @@ header{
 .app-title{font-weight:700; font-size:18px}
 .affirmation{color:var(--muted); font-size:14px; margin-top:4px}
 
+/* Containers & cards */
 .container{max-width:860px; margin:0 auto; padding:16px; padding-bottom:84px}
 .card{
   background:var(--panel);
@@ -37,27 +60,29 @@ header{
   padding:16px;
   margin-bottom:16px;
 }
-.mb-safe{ margin-bottom:120px !important } /* extra bottom space when needed */
+.mb-safe{ margin-bottom:120px !important } /* extra space so last card never hides under the tab bar */
 
 .big-number{font-size:36px; font-weight:800}
+.small{font-size:12px; color:var(--muted)}
+.kbd{font-family:ui-monospace, Menlo, Consolas; font-size:12px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe}
+.row{display:flex; gap:8px; align-items:center; justify-content:space-between}
+
 .actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
 .btn{
   border:1px solid #d1d5db; background:#fff;
   padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600
 }
 .btn.primary{background:var(--brand); color:#fff; border-color:var(--brand)}
-.small{font-size:12px; color:var(--muted)}
-.kbd{font-family:ui-monospace, Menlo, Consolas; font-size:12px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe}
-.row{display:flex; gap:8px; align-items:center; justify-content:space-between}
+
+/* Inputs */
 label{font-size:14px}
 input[type="time"], input[type="date"], select, input[type="text"], input[type="number"]{
   width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; background:#fff;
 }
 
+/* Buckets (if/when you render them on Home) */
 .grid{display:grid; gap:12px}
 .grid.buckets{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
-
-/* Buckets */
 .bucket{border-radius:12px; padding:12px; background:#fff; border:1px solid #e5e7eb}
 .bucket .name{font-weight:700; display:flex; align-items:center; gap:8px}
 .bucket .emoji{font-size:22px}
@@ -66,7 +91,7 @@ input[type="time"], input[type="date"], select, input[type="text"], input[type="
 .bucket .bar{height:12px; border-radius:6px; background:#edf2f7; margin-top:8px; overflow:hidden}
 .bucket .bar > div{height:100%; width:0%}
 
-/* Toast */
+/* Toast (optional) */
 .toast{
   position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
   background:#111827; color:#fff; padding:10px 14px; border-radius:10px;
@@ -84,7 +109,7 @@ input[type="time"], input[type="date"], select, input[type="text"], input[type="
 .tabbar a{color:#fff; text-decoration:none; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:2px}
 .tabbar .ico{font-size:18px; line-height:18px}
 
-/* Phone-friendly max width on big screens */
+/* Larger screens center the tab bar */
 @media (min-width:760px){
   .tabbar{max-width:860px; margin:0 auto}
 }
