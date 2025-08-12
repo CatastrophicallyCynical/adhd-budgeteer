@@ -1,5 +1,5 @@
 :root{
-  --bg:#f7f8fb;
+  --bg:#EAE4DC;
   --panel:#ffffff;
   --ink:#1f2937;
   --muted:#6b7280;
@@ -62,3 +62,11 @@ input[type="time"], select, input[type="text"], input[type="number"]{
 .toast.show{opacity:1}
 .about{ text-align:center; }
 .about h2{ margin-top:0 }
+.color-dot{ width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,.15); display:inline-block }
+.bucket .name{ display:flex; align-items:center; gap:8px; font-size:16px }
+.bucket .emoji{ font-size:22px }
+.bucket .meta{ display:flex; gap:8px; align-items:center; color:var(--muted); font-size:12px }
+.bucket .chips .chip{ padding:4px; min-width:0 }
+.bucket .chips .chip span{ display:block }
+.bucket .bar{ height:12px }
+.grid.buckets .bucket{ display:flex; flex-direction:column; gap:8px }
