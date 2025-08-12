@@ -25,9 +25,23 @@
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 <script>
+/* History with working edit/delete for both expenses & income */
 function load(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } }
+function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 function title(y,m){ return new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
 function range(y,m){ return [new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()]; }
+
+/* MIGRATE ids */
+(function migrate(){
+  const ex = load('budgeteer_expenses',[]);
+  const inc = load('budgeteer_income',[]);
+  let t=false;
+  for (const e of ex){ if(!e.id){ e.id=(crypto?.randomUUID?.()||String(Date.now())+Math.random()); t=true; } if(typeof e.amount==='string'){ e.amount=Number(e.amount)||0; t=true; } }
+  if (t) save('budgeteer_expenses',ex);
+  t=false;
+  for (const i of inc){ if(!i.id){ i.id=(crypto?.randomUUID?.()||String(Date.now())+Math.random()); t=true; } if(typeof i.amount==='string'){ i.amount=Number(i.amount)||0; t=true; } }
+  if (t) save('budgeteer_income',inc);
+})();
 
 let Y=new Date().getFullYear(), M=new Date().getMonth();
 document.getElementById('prev').onclick=()=>{ if(--M<0){M=11;Y--;} render(); };
@@ -37,21 +51,70 @@ document.getElementById('type').onchange=()=> render();
 function render(){
   document.getElementById('monthTitle').textContent = title(Y,M);
   const [s,e]=range(Y,M);
-  const exp = load('budgeteer_expenses', []).map(x=>({type:'exp',...x,ts:new Date(x.date+'T12:00').getTime()}));
-  const inc = load('budgeteer_income', []).map(x=>({type:'inc',...x,ts:new Date(x.date+'T12:00').getTime()}));
+  const exp = load('budgeteer_expenses', []).map(x=>({kind:'exp',...x,ts:new Date((x.date||'')+'T12:00').getTime()}));
+  const inc = load('budgeteer_income', []).map(x=>({kind:'inc',...x,ts:new Date((x.date||'')+'T12:00').getTime()}));
   const rows = [...exp,...inc].filter(x=>x.ts>=s&&x.ts<e).sort((a,b)=>b.ts-a.ts);
 
   const f=document.getElementById('type').value;
-  const filtered = rows.filter(r=> f==='all' ? true : (f==='income'? r.type==='inc' : r.type==='exp'));
+  const filtered = rows.filter(r=> f==='all' ? true : (f==='income'? r.kind==='inc' : r.kind==='exp'));
 
   const list = document.getElementById('list');
   list.innerHTML = filtered.length ? '' : '<div class="small">No entries.</div>';
   for(const r of filtered){
-    const div=document.createElement('div'); div.className='row'; div.style.borderTop='1px solid #e5e7eb'; div.style.padding='8px 0';
-    const amt = (r.type==='inc'? '+' : '') + Number(r.amount).toFixed(2);
-    div.innerHTML = `<div class="small">${new Date(r.ts).toLocaleString()} • ${(r.note||'—').replace(/</g,'&lt;')}</div><div class="small">${amt}</div>`;
+    const div=document.createElement('div'); div.className='row'; div.style.borderTop='1px solid rgba(0,0,0,.08)'; div.style.padding='8px 0';
+    const amt = (r.kind==='inc'? '+' : '') + Number(r.amount).toFixed(2);
+    div.innerHTML = `
+      <div class="small">${new Date(r.ts).toLocaleString()} • ${(r.note||'—').replace(/</g,'&lt;')}</div>
+      <div class="row" style="gap:6px">
+        <div class="small">${amt}</div>
+        <button class="btn" data-edit="${r.kind}:${r.id}">Edit</button>
+        <button class="btn" data-del="${r.kind}:${r.id}">Delete</button>
+      </div>`;
     list.appendChild(div);
   }
+
+  // wire edit/delete with dataset "kind:id"
+  list.querySelectorAll('[data-edit]').forEach(b=>{
+    b.onclick = ()=>{
+      const [kind,id]=b.getAttribute('data-edit').split(':');
+      if (kind==='exp'){
+        const all = load('budgeteer_expenses', []);
+        const i = all.findIndex(x=>x.id===id); if (i<0) return;
+        const cur = all[i];
+        const amt = Number(prompt('Amount (negative for expense)', cur.amount));
+        if (Number.isNaN(amt)) return;
+        const note = prompt('Note', cur.note||'') || '';
+        const date = prompt('Date (YYYY-MM-DD)', cur.date || new Date().toISOString().slice(0,10)) || cur.date;
+        all[i] = {...cur, amount: amt, note, date};
+        save('budgeteer_expenses', all); render();
+      } else {
+        const all = load('budgeteer_income', []);
+        const i = all.findIndex(x=>x.id===id); if (i<0) return;
+        const cur = all[i];
+        const amt = Number(prompt('Amount (positive)', cur.amount));
+        if (Number.isNaN(amt) || amt<=0) return;
+        const note = prompt('Note', cur.note||'') || '';
+        const date = prompt('Date (YYYY-MM-DD)', cur.date || new Date().toISOString().slice(0,10)) || cur.date;
+        all[i] = {...cur, amount: amt, note, date};
+        save('budgeteer_income', all); render();
+      }
+    };
+  });
+
+  list.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick = ()=>{
+      const [kind,id]=b.getAttribute('data-del').split(':');
+      if (!confirm('Delete this entry?')) return;
+      if (kind==='exp'){
+        const all = load('budgeteer_expenses', []);
+        save('budgeteer_expenses', all.filter(x=>x.id!==id));
+      } else {
+        const all = load('budgeteer_income', []);
+        save('budgeteer_income', all.filter(x=>x.id!==id));
+      }
+      render();
+    };
+  });
 }
 render();
 </script>
