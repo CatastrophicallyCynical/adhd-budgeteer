@@ -3,35 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Gentle Budget</title>
+<title>Budgeteer</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
 <meta name="theme-color" content="#3949AB">
 <style>
-  /* phone-first tab bar */
-  .tabbar{
-    position:fixed; inset:auto 0 0 0; height:58px;
-    background:#111827; display:flex; justify-content:space-around; align-items:center;
-    padding:6px env(safe-area-inset-left) 6px env(safe-area-inset-right); z-index:50;
-    border-top:1px solid #000;
-  }
-  .tabbar a{
-    color:#fff; text-decoration:none; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:2px;
-  }
+  .tabbar{position:fixed; inset:auto 0 0 0; height:58px; background:#111827; display:flex; justify-content:space-around; align-items:center; padding:6px env(safe-area-inset-left) 6px env(safe-area-inset-right); z-index:50; border-top:1px solid #000}
+  .tabbar a{color:#fff; text-decoration:none; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:2px}
   .tabbar .ico{font-size:18px; line-height:18px}
-  body{ padding-bottom:72px } /* keep content above tab bar */
-  @media (min-width:760px){ .tabbar{max-width:860px; margin:0 auto} body{display:flex; justify-content:center} }
 </style>
 </head>
 <body>
 <header>
-  <div class="app-title">Gentle Budget</div>
+  <div class="app-title">Budgeteer</div>
   <div class="affirmation"></div>
 </header>
 
 <div class="container" id="app"></div>
 
-<!-- bottom tabs -->
 <nav class="tabbar">
   <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
   <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
@@ -40,7 +29,12 @@
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
-<script type="module" src="app.js"></script>
+<script type="module">
+  import { applyTheme } from './theme.js';
+  await applyTheme();          // make theme stick before rendering
+  // then load the app
+  import('./app.js');
+</script>
 <script>
 if ('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js');
