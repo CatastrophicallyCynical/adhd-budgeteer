@@ -1,7 +1,7 @@
 <!doctype html><html>
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Recurring</title>
+  <title>Recurring · Budgeteer</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,9 +29,9 @@
 </nav>
 
 <script type="module">
+import { applyTheme } from './theme.js'; await applyTheme();
 import { idb } from './db.js';
 await idb.open();
-
 document.getElementById('backBtn').onclick = ()=> history.back();
 
 const buckets = await idb.all('buckets');
@@ -93,11 +93,11 @@ async function handleAction({act,id}){
     const tx = { id: crypto.randomUUID(), ts: Date.now(), amount: (r.type==='income'?+amt:-Math.abs(amt)), bucketId: r.bucketId||'', note: `recurring: ${r.name}` };
     await idb.put('transactions', tx);
 
-    const next = new Date(r.nextDueISO);
-    if (r.cadence==='weekly') next.setDate(next.getDate()+7);
-    else if (r.cadence==='biweekly') next.setDate(next.getDate()+14);
-    else next.setMonth(next.getMonth()+1);
-    r.nextDueISO = next.toISOString();
+    const n = new Date(r.nextDueISO);
+    if (r.cadence==='weekly') n.setDate(n.getDate()+7);
+    else if (r.cadence==='biweekly') n.setDate(n.getDate()+14);
+    else n.setMonth(n.getMonth()+1);
+    r.nextDueISO = n.toISOString();
     await idb.put('recurring', r);
 
     alert('Logged'); render();
