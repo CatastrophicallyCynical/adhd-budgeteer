@@ -46,8 +46,13 @@
       </label>
     </div>
 
-    <div class="actions">
-      <button class="btn primary" id="save">Save</button>
+   <div class="actions">
+  <button class="btn" id="cancel">Cancel</button>
+  <button class="btn primary" id="save">Save</button>
+</div>
+<script type="module">
+document.getElementById('cancel').onclick = ()=> history.back();
+</script>
     </div>
   </div>
 </div>
