@@ -18,6 +18,22 @@
         <div class="kbd" id="monthTitle"></div>
         <button class="btn" id="next">▶</button>
       </div>
+    <div id="summary" class="small" style="margin-top:8px"></div>
+<div class="card">
+  <div class="row" style="align-items:center">
+    <div class="row" style="gap:8px">
+      <button class="btn" id="prev">◀</button>
+      <div class="kbd" id="monthTitle"></div>
+      <button class="btn" id="next">▶</button>
+    </div>
+    <div class="actions">
+      <a class="btn" href="expense.html">Add Expense</a>
+      <a class="btn" href="income.html">Add Income</a>
+    </div>
+  </div>
+  <!-- NEW: budget summary line -->
+  <div id="summary" class="small" style="margin-top:8px"></div>
+</div>
       <div class="actions">
         <a class="btn" href="expense.html">Add Expense</a>
         <a class="btn" href="income.html">Add Income</a>
@@ -44,8 +60,8 @@
 </nav>
 
 <script type="module">
-/* Minimal Budgeteer home logic (localStorage-only) + robust edit/delete */
-const LS = { expenses:'budgeteer_expenses', buckets:'budgeteer_buckets' };
+/* Budgeteer home with Spendable summary */
+const LS = { expenses:'budgeteer_expenses', income:'budgeteer_income', buckets:'budgeteer_buckets' };
 const DEFAULT_BUCKETS = [
   { id:'bills',name:'Bills',emoji:'💡'},{ id:'groceries',name:'Groceries',emoji:'🍎'},
   { id:'eatingout',name:'Eating Out',emoji:'🍔'},{ id:'transport',name:'Transport',emoji:'🚌'},
@@ -53,25 +69,26 @@ const DEFAULT_BUCKETS = [
   { id:'kids',name:'Kids',emoji:'👶'},{ id:'other',name:'Other',emoji:'📦'},
   { id:'savings',name:'Savings',emoji:'🪙'}
 ];
+const SAVINGS_IDS = ['savings']; // exclude these from spendable expenses
+
+const fmt = n => (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function load(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } }
 function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
-
 function ensureBuckets(){ const b=load(LS.buckets,null); if(!b){ save(LS.buckets,DEFAULT_BUCKETS); return DEFAULT_BUCKETS; } return b; }
-
-/* --- MIGRATION: give every expense an id if missing --- */
-function migrate(){
-  const exps = load(LS.expenses, []);
-  let touched = false;
-  for (const e of exps){
-    if (!e.id) { e.id = (crypto?.randomUUID?.() || String(Date.now())+Math.random().toString(16).slice(2)); touched = true; }
-    if (typeof e.amount === 'string') { e.amount = Number(e.amount)||0; touched = true; }
-  }
-  if (touched) save(LS.expenses, exps);
-}
-migrate();
 
 function range(y,m){ return [new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()]; }
 function title(y,m){ return new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
+
+/* MIGRATION: ensure every expense has id and numeric amount */
+(function migrate(){
+  const exps = load(LS.expenses, []);
+  let touched=false;
+  for (const e of exps){
+    if (!e.id) { e.id=(crypto?.randomUUID?.()||String(Date.now())+Math.random().toString(16).slice(2)); touched=true; }
+    if (typeof e.amount==='string') { e.amount=Number(e.amount)||0; touched=true; }
+  }
+  if (touched) save(LS.expenses, exps);
+})();
 
 let Y=new Date().getFullYear(), M=new Date().getMonth();
 document.getElementById('prev').onclick=()=>{ if(--M<0){M=11;Y--;} render(); };
@@ -79,16 +96,43 @@ document.getElementById('next').onclick=()=>{ if(++M>11){M=0;Y++;} render(); };
 
 function render(){
   const buckets = ensureBuckets();
-  const exps = load(LS.expenses, []);
+  const expsAll = load(LS.expenses, []);
+  const incAll  = load(LS.income,   []);
   document.getElementById('monthTitle').textContent = title(Y,M);
+
   const [s,e]=range(Y,M);
-  const month = exps.filter(x=>{ const ts=new Date((x.date||'')+'T12:00').getTime(); return ts>=s && ts<e; });
-  const by = Object.fromEntries(buckets.map(b=>[b.id,[]])); month.forEach(x=>{ (by[x.bucketId] ||= []).push(x); });
+  // Filter by month
+  const monthExp = expsAll.filter(x=>{ const ts=new Date((x.date||'')+'T12:00').getTime(); return ts>=s && ts<e; });
+  const monthInc = incAll .filter(x=>{ const ts=new Date((x.date||'')+'T12:00').getTime(); return ts>=s && ts<e; });
+
+  // --- Budget math ---
+  const incomeTotal = monthInc.reduce((sum,x)=> sum + (Number(x.amount)||0), 0);
+  // For expenses, exclude savings buckets; treat any positive by mistake as absolute spend
+  const spendNonSavings = monthExp
+    .filter(x => !SAVINGS_IDS.includes(x.bucketId))
+    .reduce((sum,x)=>{
+      const a = Number(x.amount)||0;
+      return sum + (a<0 ? -a : Math.abs(a));
+    }, 0);
+
+  const spendable = incomeTotal - spendNonSavings;
+
+  // Render summary line
+  const summary = document.getElementById('summary');
+  summary.innerHTML = `
+    <b>Spendable:</b> $${fmt(spendable)}
+    &nbsp;•&nbsp; <span class="small">Income: $${fmt(incomeTotal)}</span>
+    &nbsp;•&nbsp; <span class="small">Expenses (excl. Savings): $${fmt(spendNonSavings)}</span>
+  `;
+
+  // --- Buckets grid ---
+  const by = Object.fromEntries(buckets.map(b=>[b.id,[]]));
+  monthExp.forEach(x=>{ (by[x.bucketId] ||= []).push(x); });
 
   const list=document.getElementById('bucketList'); list.innerHTML='';
   for(const b of buckets){
     const items = by[b.id] || [];
-    const total = items.reduce((s,x)=> s + Number(x.amount||0), 0);
+    const total = items.reduce((s,x)=> s + (Number(x.amount)||0), 0);
     const card=document.createElement('div');
     card.className='bucket';
     card.innerHTML = `
@@ -99,7 +143,7 @@ function render(){
           <button class="btn" data-expand="${b.id}">▾</button>
         </div>
       </div>
-      <div class="small">This month: <b>${total.toFixed(2)}</b></div>
+      <div class="small">This month: <b>${fmt(total)}</b></div>
       <div class="bar"><div style="width:${Math.min(100, Math.abs(total))}%"></div></div>
       <div class="details" id="d-${b.id}" style="display:none; margin-top:8px">
         ${
@@ -107,7 +151,7 @@ function render(){
             <div class="row small" data-item="${x.id}">
               <div>${x.date||'—'} • ${(x.note||'—').replace(/</g,'&lt;')}</div>
               <div style="display:flex; gap:6px; align-items:center">
-                <span>${Number(x.amount).toFixed(2)}</span>
+                <span>${fmt(x.amount)}</span>
                 <button class="btn" data-edit="${x.id}">Edit</button>
                 <button class="btn" data-del="${x.id}">Delete</button>
               </div>
@@ -146,8 +190,7 @@ function render(){
       const id = btn.getAttribute('data-del');
       if (!confirm('Delete this item?')) return;
       const all = load(LS.expenses, []);
-      const next = all.filter(x=>x.id!==id);
-      save(LS.expenses, next);
+      save(LS.expenses, all.filter(x=>x.id!==id));
       render();
     };
   });
@@ -155,4 +198,5 @@ function render(){
 
 render();
 </script>
+
 </body></html>
