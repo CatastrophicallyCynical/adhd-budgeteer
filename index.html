@@ -5,10 +5,9 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<script src="theme-apply.js"></script>
 <header>
   <div class="app-title">Budgeteer</div>
-  <div class="affirmation small">You’re doing enough. Then some.</div>
+  <div class="affirmation small">Small wins count.</div>
 </header>
 
 <div class="container">
@@ -22,6 +21,8 @@
       <div class="actions">
         <a class="btn" href="expense.html">Add Expense</a>
         <a class="btn" href="income.html">Add Income</a>
+        <a class="btn" href="history.html">History</a>
+        <a class="btn" href="about.html">About</a>
       </div>
     </div>
   </div>
@@ -42,5 +43,64 @@
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
-<script type="module" src="app.js"></script>
+<script type="module">
+const LS = { expenses:'budgeteer_expenses', buckets:'budgeteer_buckets' };
+const DEFAULT_BUCKETS = [
+  { id:'bills',name:'Bills',emoji:'💡'},{ id:'groceries',name:'Groceries',emoji:'🍎'},
+  { id:'eatingout',name:'Eating Out',emoji:'🍔'},{ id:'transport',name:'Transport',emoji:'🚌'},
+  { id:'fun',name:'Fun',emoji:'🎮'},{ id:'health',name:'Health',emoji:'🏥'},
+  { id:'kids',name:'Kids',emoji:'👶'},{ id:'other',name:'Other',emoji:'📦'},
+  { id:'savings',name:'Savings',emoji:'🪙'}
+];
+function load(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } }
+function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+function ensureBuckets(){ const b=load(LS.buckets,null); if(!b){ save(LS.buckets,DEFAULT_BUCKETS); return DEFAULT_BUCKETS; } return b; }
+function range(y,m){ return [new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()]; }
+function title(y,m){ return new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
+
+let Y=new Date().getFullYear(), M=new Date().getMonth();
+document.getElementById('prev').onclick=()=>{ if(--M<0){M=11;Y--;} render(); };
+document.getElementById('next').onclick=()=>{ if(++M>11){M=0;Y++;} render(); };
+
+function render(){
+  const buckets = ensureBuckets();
+  const exps = load(LS.expenses, []);
+  document.getElementById('monthTitle').textContent = title(Y,M);
+  const [s,e]=range(Y,M);
+  const month = exps.filter(x=>{ const ts=new Date((x.date||'')+'T12:00').getTime(); return ts>=s && ts<e; });
+  const by = Object.fromEntries(buckets.map(b=>[b.id,[]])); month.forEach(x=>{ (by[x.bucketId] ||= []).push(x); });
+
+  const list=document.getElementById('bucketList'); list.innerHTML='';
+  for(const b of buckets){
+    const items = by[b.id] || [];
+    const total = items.reduce((s,x)=> s + Number(x.amount||0), 0);
+    const card=document.createElement('div');
+    card.className='bucket';
+    card.innerHTML = `
+      <div class="row" style="align-items:center">
+        <div class="name"><span class="emoji">${b.emoji}</span> ${b.name}</div>
+        <div class="row" style="gap:8px">
+          <a class="btn" href="expense.html?bucket=${encodeURIComponent(b.id)}">＋</a>
+          <button class="btn" data-expand="${b.id}">▾</button>
+        </div>
+      </div>
+      <div class="small">This month: <b>${total.toFixed(2)}</b></div>
+      <div class="bar"><div style="width:${Math.min(100, Math.abs(total))}%"></div></div>
+      <div class="details" id="d-${b.id}" style="display:none; margin-top:8px">
+        ${
+          items.length ? items.map(x=>`
+            <div class="row small">
+              <div>${x.date||'—'} • ${(x.note||'—').replace(/</g,'&lt;')}</div>
+              <div>${Number(x.amount).toFixed(2)}</div>
+            </div>`).join('') : `<div class="small">No items in ${title(Y,M)}.</div>`
+        }
+      </div>`;
+    list.appendChild(card);
+  }
+  list.querySelectorAll('[data-expand]').forEach(btn=>{
+    btn.onclick = ()=>{ const id=btn.getAttribute('data-expand'); const el=document.getElementById('d-'+id); el.style.display = (el.style.display==='none'||!el.style.display)?'block':'none'; };
+  });
+}
+render();
+</script>
 </body></html>
