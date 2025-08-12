@@ -1,16 +1,18 @@
-<!doctype html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Budgeteer</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budgeteer</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <header>
-  <div class="app-title">Budgeteer</div>
-  <div class="affirmation small">Small wins count.</div>
+  <h1>Budgeteer</h1>
 </header>
 
-<div class="container">
+<main>
   <div class="card">
     <div class="row" style="align-items:center">
       <div class="row" style="gap:8px">
@@ -18,34 +20,26 @@
         <div class="kbd" id="monthTitle"></div>
         <button class="btn" id="next">▶</button>
       </div>
-</div>
       <div class="actions">
         <a class="btn" href="expense.html">Add Expense</a>
         <a class="btn" href="income.html">Add Income</a>
-        <a class="btn" href="history.html">History</a>
-        <a class="btn" href="about.html">About</a>
       </div>
     </div>
+    <!-- Spendable Summary -->
+    <div id="summary" class="small" style="margin-top:8px"></div>
   </div>
 
-  <div class="card">
-    <div class="row"><div style="font-weight:700">Buckets</div>
-      <div class="small">Tap ▾ to see this month’s items • ＋ to add to that bucket</div>
-    </div>
-    <div id="bucketList" class="grid buckets" style="margin-bottom:72px"></div>
-  </div>
-</div>
+  <!-- Bucket list -->
+  <div id="bucketList" style="margin-top:16px"></div>
+</main>
 
-<nav class="tabbar">
-  <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
-  <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
-  <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
-  <a href="history.html"><span class="ico">📜</span><span>History</span></a>
-  <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
+<nav>
+  <a href="index.html">🏠</a>
+  <a href="recurring.html">🔁</a>
+  <a href="about.html">ℹ️</a>
 </nav>
 
 <script type="module">
-/* Budgeteer home with Spendable summary */
 const LS = { expenses:'budgeteer_expenses', income:'budgeteer_income', buckets:'budgeteer_buckets' };
 const DEFAULT_BUCKETS = [
   { id:'bills',name:'Bills',emoji:'💡'},{ id:'groceries',name:'Groceries',emoji:'🍎'},
@@ -54,17 +48,16 @@ const DEFAULT_BUCKETS = [
   { id:'kids',name:'Kids',emoji:'👶'},{ id:'other',name:'Other',emoji:'📦'},
   { id:'savings',name:'Savings',emoji:'🪙'}
 ];
-const SAVINGS_IDS = ['savings']; // exclude these from spendable expenses
+const SAVINGS_IDS = ['savings'];
 
 const fmt = n => (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function load(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } }
 function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 function ensureBuckets(){ const b=load(LS.buckets,null); if(!b){ save(LS.buckets,DEFAULT_BUCKETS); return DEFAULT_BUCKETS; } return b; }
-
 function range(y,m){ return [new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()]; }
 function title(y,m){ return new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
 
-/* MIGRATION: ensure every expense has id and numeric amount */
+// Data migration
 (function migrate(){
   const exps = load(LS.expenses, []);
   let touched=false;
@@ -86,31 +79,24 @@ function render(){
   document.getElementById('monthTitle').textContent = title(Y,M);
 
   const [s,e]=range(Y,M);
-  // Filter by month
   const monthExp = expsAll.filter(x=>{ const ts=new Date((x.date||'')+'T12:00').getTime(); return ts>=s && ts<e; });
   const monthInc = incAll .filter(x=>{ const ts=new Date((x.date||'')+'T12:00').getTime(); return ts>=s && ts<e; });
 
-  // --- Budget math ---
   const incomeTotal = monthInc.reduce((sum,x)=> sum + (Number(x.amount)||0), 0);
-  // For expenses, exclude savings buckets; treat any positive by mistake as absolute spend
   const spendNonSavings = monthExp
     .filter(x => !SAVINGS_IDS.includes(x.bucketId))
     .reduce((sum,x)=>{
       const a = Number(x.amount)||0;
       return sum + (a<0 ? -a : Math.abs(a));
     }, 0);
-
   const spendable = incomeTotal - spendNonSavings;
 
-  // Render summary line
-  const summary = document.getElementById('summary');
-  summary.innerHTML = `
+  document.getElementById('summary').innerHTML = `
     <b>Spendable:</b> $${fmt(spendable)}
     &nbsp;•&nbsp; <span class="small">Income: $${fmt(incomeTotal)}</span>
     &nbsp;•&nbsp; <span class="small">Expenses (excl. Savings): $${fmt(spendNonSavings)}</span>
   `;
 
-  // --- Buckets grid ---
   const by = Object.fromEntries(buckets.map(b=>[b.id,[]]));
   monthExp.forEach(x=>{ (by[x.bucketId] ||= []).push(x); });
 
@@ -150,7 +136,6 @@ function render(){
   list.querySelectorAll('[data-expand]').forEach(btn=>{
     btn.onclick = ()=>{ const id=btn.getAttribute('data-expand'); const el=document.getElementById('d-'+id); el.style.display = (el.style.display==='none'||!el.style.display)?'block':'none'; };
   });
-
   // edit
   list.querySelectorAll('[data-edit]').forEach(btn=>{
     btn.onclick = ()=>{
@@ -168,7 +153,6 @@ function render(){
       render();
     };
   });
-
   // delete
   list.querySelectorAll('[data-del]').forEach(btn=>{
     btn.onclick = ()=>{
@@ -180,8 +164,8 @@ function render(){
     };
   });
 }
-
 render();
 </script>
 
-</body></html>
+</body>
+</html>
