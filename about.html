@@ -1,61 +1,144 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>About</title>
-<link rel="stylesheet" href="style.css">
-</head><body>
+<!doctype html><html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>About</title>
+  <link rel="stylesheet" href="style.css">
+  <style>.swatches{display:flex; flex-wrap:wrap; gap:8px}.dot{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.2);cursor:pointer}</style>
+</head>
+<body>
+<header>
+  <div class="app-title">About</div>
+  <div class="affirmation small"></div>
+</header>
+
 <div class="container">
   <div class="card about">
-    <div style="font-size:36px; line-height:1">❤️</div>
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <div style="font-size:36px; line-height:1">❤️</div>
+      <button class="btn" id="backBtn">Back</button>
+    </div>
     <h2>Built with care by James for Cameron</h2>
     <div><em>love you, brother &lt;3</em></div>
     <hr>
     <div class="small" id="ver"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700; margin-bottom:8px">Theme (phone-friendly)</div>
+    <div class="small" style="margin-bottom:8px">Pick colors for background, panels, and text (from our safe palette).</div>
+    <div class="row"><div>Background</div><div class="swatches" id="bgSw"></div></div>
+    <div class="row"><div>Panels</div><div class="swatches" id="panelSw"></div></div>
+    <div class="row"><div>Text</div><div class="swatches" id="inkSw"></div></div>
+    <div class="actions" style="justify-content:center; margin-top:12px">
+      <button class="btn" id="saveTheme">Save Theme</button>
+      <button class="btn" id="resetTheme">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="actions" style="justify-content:center">
       <button class="btn" id="export">Export settings</button>
       <button class="btn" id="import">Import settings</button>
     </div>
   </div>
 </div>
+
+<nav class="tabbar">
+  <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
+  <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
+  <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
+  <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
+  <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
+</nav>
+
 <script type="module">
-(async function(){
-  const meta = await fetch('./appMeta.json').then(r=>r.json());
-  document.getElementById('ver').textContent = `Version ${meta.version} • Last updated ${new Date(meta.build_timestamp).toLocaleString()}`;
-  document.getElementById('export').addEventListener('click', async ()=>{
-    const db = await indexedDB.open('gentle-budget');
-    db.onsuccess = async ()=>{
-      const d=db.result;
-      const tx=d.transaction(['settings','buckets','transactions','recurring']);
-      const out={};
+import { idb } from './db.js';
+await idb.open();
+
+document.getElementById('backBtn').onclick = ()=> history.back();
+
+const meta = await fetch('./appMeta.json').then(r=>r.json());
+document.getElementById('ver').textContent = `Version ${meta.version} • Last updated ${new Date(meta.build_timestamp).toLocaleString()}`;
+
+const PALETTE = [
+  {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
+  {name:'Coral',hex:'#FF8A65'},{name:'Lavender',hex:'#BA68C8'},{name:'Mint',hex:'#4DB6AC'},
+  {name:'Sand',hex:'#FBC02D'},{name:'Slate',hex:'#90A4AE'},{name:'Rose',hex:'#F48FB1'},
+  {name:'Navy',hex:'#3949AB'}
+];
+
+function renderSwatches(elId, key){
+  const el = document.getElementById(elId);
+  el.innerHTML = '';
+  for(const c of PALETTE){
+    const d = document.createElement('span');
+    d.className='dot'; d.title = c.name; d.style.background = c.hex;
+    d.addEventListener('click', ()=> pick(key, c.hex));
+    el.appendChild(d);
+  }
+}
+
+const picks = { bg:null, panel:null, ink:null };
+function pick(key, val){
+  picks[key] = val;
+  document.documentElement.style.setProperty(`--${key}`, val);
+}
+
+renderSwatches('bgSw','bg');
+renderSwatches('panelSw','panel');
+renderSwatches('inkSw','ink');
+
+document.getElementById('saveTheme').onclick = async ()=>{
+  const s = (await idb.get('settings','app')) || {};
+  s.themeCustom = {
+    bg:    picks.bg    || getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+    panel: picks.panel || getComputedStyle(document.documentElement).getPropertyValue('--panel').trim(),
+    ink:   picks.ink   || getComputedStyle(document.documentElement).getPropertyValue('--ink').trim(),
+  };
+  await idb.set('settings','app', s);
+  alert('Theme saved');
+};
+
+document.getElementById('resetTheme').onclick = async ()=>{
+  const s = (await idb.get('settings','app')) || {};
+  s.themeCustom = { bg:null, panel:null, ink:null };
+  await idb.set('settings','app', s);
+  // default
+  document.documentElement.style.setProperty('--bg', '#EAE4DC');
+  document.documentElement.style.setProperty('--panel', '#ffffff');
+  document.documentElement.style.setProperty('--ink', '#1f2937');
+  alert('Theme reset');
+};
+
+document.getElementById('export').addEventListener('click', async ()=>{
+  const dbreq = indexedDB.open('gentle-budget');
+  dbreq.onsuccess = async ()=>{
+    const d=dbreq.result;
+    const tx=d.transaction(['settings','buckets','transactions','recurring']);
+    const out={};
+    for (const store of ['settings','buckets','transactions','recurring']){
+      out[store] = await new Promise((res)=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result); });
+    }
+    const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+    const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'gentle-budget-backup.json'}); a.click();
+  };
+});
+document.getElementById('import').addEventListener('click', async ()=>{
+  const input = Object.assign(document.createElement('input'),{type:'file', accept:'application/json'});
+  input.onchange = async ()=>{
+    const text = await input.files[0].text(); const data = JSON.parse(text);
+    const dbreq = indexedDB.open('gentle-budget');
+    dbreq.onsuccess = ()=>{
+      const d=dbreq.result;
+      const tx=d.transaction(['settings','buckets','transactions','recurring'],'readwrite');
       for (const store of ['settings','buckets','transactions','recurring']){
-        out[store] = await new Promise((res)=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result); });
+        const s=tx.objectStore(store);
+        if (store==='settings'){ s.put(data.settings?.[0]||data.settings,'app'); } else { for (const item of data[store]||[]) s.put(item); }
       }
-      const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
-      const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'gentle-budget-backup.json'});
-      a.click();
+      alert('Imported');
     };
-  });
-  document.getElementById('import').addEventListener('click', async ()=>{
-    const input = Object.assign(document.createElement('input'),{type:'file', accept:'application/json'});
-    input.onchange = async ()=>{
-      const text = await input.files[0].text();
-      const data = JSON.parse(text);
-      const dbreq = indexedDB.open('gentle-budget');
-      dbreq.onsuccess = ()=>{
-        const d=dbreq.result;
-        const tx=d.transaction(['settings','buckets','transactions','recurring'],'readwrite');
-        for (const store of ['settings','buckets','transactions','recurring']){
-          const s=tx.objectStore(store);
-          if (store==='settings'){
-            s.put(data.settings?.[0]||data.settings,'app');
-          } else {
-            for (const item of data[store]||[]) s.put(item);
-          }
-        }
-        alert('Imported');
-      };
-    };
-    input.click();
-  });
-})();
+  };
+  input.click();
+});
 </script>
 </body></html>
