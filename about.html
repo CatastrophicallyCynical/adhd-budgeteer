@@ -3,16 +3,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>About · Budgeteer</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    .swatches{display:flex; flex-wrap:wrap; gap:8px}
-    .dot{width:28px;height:28px;border-radius:50%;
-         border:2px solid rgba(0,0,0,.35); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);
-         cursor:pointer}
-    .dot[aria-selected="true"]{outline:2px solid #111827; outline-offset:2px}
-  </style>
 </head>
 <body>
-<script src="theme-apply.js"></script>
 <header>
   <div class="app-title">About</div>
   <div class="affirmation small"></div>
@@ -28,19 +20,6 @@
     <div><em>You're worth every bit of frustration this code was.</em></div>
     <hr>
     <div class="small" id="ver"></div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700; margin-bottom:8px">Theme</div>
-    <div class="small" style="margin-bottom:8px">Tap a color to set <b>Background</b>, <b>Panels</b>, or <b>Text</b>. Saves instantly.</div>
-
-    <div class="row"><div>Background</div><div class="swatches" id="bgRow"></div></div>
-    <div class="row"><div>Panels</div><div class="swatches" id="panelRow"></div></div>
-    <div class="row"><div>Text</div><div class="swatches" id="inkRow"></div></div>
-
-    <div class="actions" style="justify-content:center; margin-top:12px">
-      <button class="btn" id="resetTheme">Reset to default</button>
-    </div>
   </div>
 
   <div class="card">
@@ -65,71 +44,13 @@
 </nav>
 
 <script>
-// --- storage helpers ---
-function loadMeta(){ try{ return JSON.parse(localStorage.getItem('budgeteer_meta'))||{}; }catch{ return {}; } }
-function saveMeta(m){ localStorage.setItem('budgeteer_meta', JSON.stringify(m)); }
+document.getElementById('backBtn').onclick = ()=> history.back();
+document.getElementById('ver').textContent = `Local data • ${new Date().toLocaleString()}`;
 
-// --- palette (Black & White + your colors) ---
-const PALETTE = [
-  {name:'White',hex:'#FFFFFF'},{name:'Black',hex:'#000000'},
-  {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
-  {name:'Coral',hex:'#FF8A65'},{name:'Lavender',hex:'#BA68C8'},{name:'Mint',hex:'#4DB6AC'},
-  {name:'Sand',hex:'#FBC02D'},{name:'Slate',hex:'#90A4AE'},{name:'Rose',hex:'#F48FB1'},
-  {name:'Navy',hex:'#3949AB'}
-];
-
-// --- apply + persist one variable ---
-function pick(key, hex){
-  // set CSS var now
-  document.documentElement.style.setProperty(`--${key}`, hex);
-  // persist to meta.themeCustom
-  const meta = loadMeta();
-  meta.themeCustom = meta.themeCustom || {};
-  meta.themeCustom[key] = hex;
-  saveMeta(meta);
-  // mark as custom so theme-apply.js prefers vars
-  document.body.setAttribute('data-theme', 'custom');
-  // refresh selected rings
-  renderRow('bgRow','bg'); renderRow('panelRow','panel'); renderRow('inkRow','ink');
-}
-
-// --- render one row of swatches tied to a CSS var ---
-function renderRow(rowId, key){
-  const row = document.getElementById(rowId);
-  row.innerHTML = '';
-  const current = getComputedStyle(document.documentElement).getPropertyValue(`--${key}`).trim();
-  for (const c of PALETTE){
-    const b = document.createElement('button');
-    b.className='dot';
-    b.style.background = c.hex;
-    b.title = `${c.name}`;
-    b.setAttribute('aria-selected', (current.toLowerCase()===c.hex.toLowerCase()) ? 'true' : 'false');
-    b.onclick = ()=> pick(key, c.hex);
-    row.appendChild(b);
-  }
-}
-
-// --- reset to default theme (remove custom overrides) ---
-function resetTheme(){
-  const meta = loadMeta();
-  delete meta.themeCustom;
-  meta.theme = 'blue';               // fallback theme name (uses CSS bodies)
-  saveMeta(meta);
-  // clear inline overrides
-  document.documentElement.style.removeProperty('--bg');
-  document.documentElement.style.removeProperty('--panel');
-  document.documentElement.style.removeProperty('--ink');
-  document.body.setAttribute('data-theme', meta.theme);
-  renderRow('bgRow','bg'); renderRow('panelRow','panel'); renderRow('inkRow','ink');
-}
-
-// --- export/import + wipe (same as before) ---
 function exportSettings(){
   const out = {
-    budgeteer_meta: loadMeta(),
     budgeteer_expenses: JSON.parse(localStorage.getItem('budgeteer_expenses')||'[]'),
-    budgeteer_income: JSON.parse(localStorage.getItem('budgeteer_income')||'[]'),
-    budgeteer_recurring: JSON.parse(localStorage.getItem('budgeteer_recurring')||'[]'),
+    budgeteer_income: JSON.parse(localStorage.getItem('budgeteer_income')||'[]')
   };
   const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
   const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
@@ -139,13 +60,10 @@ function importSettings(){
   input.onchange = async ()=>{
     try{
       const text = await input.files[0].text(); const data = JSON.parse(text);
-      if (data.budgeteer_meta) localStorage.setItem('budgeteer_meta', JSON.stringify(data.budgeteer_meta));
       if (data.budgeteer_expenses) localStorage.setItem('budgeteer_expenses', JSON.stringify(data.budgeteer_expenses));
       if (data.budgeteer_income) localStorage.setItem('budgeteer_income', JSON.stringify(data.budgeteer_income));
-      if (data.budgeteer_recurring) localStorage.setItem('budgeteer_recurring', JSON.stringify(data.budgeteer_recurring));
-      // re-apply
-      location.reload();
-    }catch{ alert('Import failed.'); }
+      alert('Imported');
+    }catch{ alert('Import failed'); }
   };
   input.click();
 }
@@ -154,16 +72,8 @@ function wipeAll(){
   if (!confirm('ARE YOU SURE DUDE?? This cannot be undone.')) return;
   localStorage.clear(); location.reload();
 }
-
-// --- wire UI ---
-document.getElementById('backBtn').onclick = ()=> history.back();
-document.getElementById('resetTheme').onclick = resetTheme;
 document.getElementById('export').onclick = exportSettings;
 document.getElementById('import').onclick = importSettings;
 document.getElementById('wipe').onclick = wipeAll;
-
-// --- init ---
-document.getElementById('ver').textContent = `Local data • ${new Date().toLocaleString()}`;
-renderRow('bgRow','bg'); renderRow('panelRow','panel'); renderRow('inkRow','ink');
 </script>
 </body></html>
