@@ -1,42 +1,46 @@
-<!doctype html>
-<html lang="en">
+<!doctype html><html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Budgeteer</title>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css">
-<meta name="theme-color" content="#3949AB">
-<style>
-  .tabbar{position:fixed; inset:auto 0 0 0; height:58px; background:#111827; display:flex; justify-content:space-around; align-items:center; padding:6px env(safe-area-inset-left) 6px env(safe-area-inset-right); z-index:50; border-top:1px solid #000}
-  .tabbar a{color:#fff; text-decoration:none; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:2px}
-  .tabbar .ico{font-size:18px; line-height:18px}
-</style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Budgeteer</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<script src="theme-apply.js"></script>
 <header>
   <div class="app-title">Budgeteer</div>
-  <div class="affirmation"></div>
+  <div class="affirmation small">You’re doing enough. Then some.</div>
 </header>
 
-<div class="container" id="app"></div>
+<div class="container">
+  <div class="card">
+    <div class="row" style="align-items:center">
+      <div class="row" style="gap:8px">
+        <button class="btn" id="prev">◀</button>
+        <div class="kbd" id="monthTitle"></div>
+        <button class="btn" id="next">▶</button>
+      </div>
+      <div class="actions">
+        <a class="btn" href="expense.html">Add Expense</a>
+        <a class="btn" href="income.html">Add Income</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><div style="font-weight:700">Buckets</div>
+      <div class="small">Tap ▾ to see this month’s items • ＋ to add to that bucket</div>
+    </div>
+    <div id="bucketList" class="grid buckets" style="margin-bottom:72px"></div>
+  </div>
+</div>
 
 <nav class="tabbar">
   <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
   <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
   <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
-  <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
   <a href="history.html"><span class="ico">📜</span><span>History</span></a>
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
-<!-- boot first, no top-level await -->
-<script type="module" src="./boot.js?v=5"></script>
-<script>
-if ('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js');
-  navigator.serviceWorker.register('./firebase-messaging-sw.js');
-}
-</script>
-</body>
-</html>
+<script type="module" src="app.js"></script>
+</body></html>
