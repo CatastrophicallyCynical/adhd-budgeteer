@@ -5,7 +5,6 @@
   <link rel="stylesheet" href="style.css">
   <style>
     .swatches{display:flex; flex-wrap:wrap; gap:8px}
-    /* thick border so White is visible, inner highlight helps dark chips */
     .dot{width:28px;height:28px;border-radius:50%;
          border:2px solid rgba(0,0,0,.35); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);
          cursor:pointer}
@@ -13,7 +12,7 @@
   </style>
 </head>
 <body>
-  <script src="theme-apply.js"></script>
+<script src="theme-apply.js"></script>
 <header>
   <div class="app-title">About</div>
   <div class="affirmation small"></div>
@@ -33,7 +32,7 @@
 
   <div class="card">
     <div style="font-weight:700; margin-bottom:8px">Theme</div>
-    <div class="small" style="margin-bottom:8px">Tap a color to apply instantly (and save).</div>
+    <div class="small" style="margin-bottom:8px">Tap a color to set <b>Background</b>, <b>Panels</b>, or <b>Text</b>. Saves instantly.</div>
 
     <div class="row"><div>Background</div><div class="swatches" id="bgRow"></div></div>
     <div class="row"><div>Panels</div><div class="swatches" id="panelRow"></div></div>
@@ -51,7 +50,6 @@
     </div>
   </div>
 
-  <!-- Danger Zone with extra bottom margin so it never hides under the tab bar -->
   <div class="card mb-safe">
     <div style="font-weight:700; margin-bottom:8px">Danger zone</div>
     <button class="btn" id="wipe">Delete all local data</button>
@@ -62,73 +60,70 @@
   <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
   <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
   <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
-  <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
   <a href="history.html"><span class="ico">📜</span><span>History</span></a>
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
 <script>
-/* This About page is self-contained. It uses localStorage like your simplified app.js. */
-const THEME_KEY = 'budgeteer_meta';
-const DEFAULT_THEME = 'blue'; // mapped in CSS (alias of navy)
+// --- storage helpers ---
+function loadMeta(){ try{ return JSON.parse(localStorage.getItem('budgeteer_meta'))||{}; }catch{ return {}; } }
+function saveMeta(m){ localStorage.setItem('budgeteer_meta', JSON.stringify(m)); }
 
-function loadMeta(){
-  try{ return JSON.parse(localStorage.getItem(THEME_KEY)) || { theme: DEFAULT_THEME, version: 1 }; }
-  catch{ return { theme: DEFAULT_THEME, version: 1 }; }
+// --- palette (Black & White + your colors) ---
+const PALETTE = [
+  {name:'White',hex:'#FFFFFF'},{name:'Black',hex:'#000000'},
+  {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
+  {name:'Coral',hex:'#FF8A65'},{name:'Lavender',hex:'#BA68C8'},{name:'Mint',hex:'#4DB6AC'},
+  {name:'Sand',hex:'#FBC02D'},{name:'Slate',hex:'#90A4AE'},{name:'Rose',hex:'#F48FB1'},
+  {name:'Navy',hex:'#3949AB'}
+];
+
+// --- apply + persist one variable ---
+function pick(key, hex){
+  // set CSS var now
+  document.documentElement.style.setProperty(`--${key}`, hex);
+  // persist to meta.themeCustom
+  const meta = loadMeta();
+  meta.themeCustom = meta.themeCustom || {};
+  meta.themeCustom[key] = hex;
+  saveMeta(meta);
+  // mark as custom so theme-apply.js prefers vars
+  document.body.setAttribute('data-theme', 'custom');
+  // refresh selected rings
+  renderRow('bgRow','bg'); renderRow('panelRow','panel'); renderRow('inkRow','ink');
 }
-function saveMeta(m){ localStorage.setItem(THEME_KEY, JSON.stringify(m)); }
 
-function applyThemeName(name){
-  document.body.setAttribute('data-theme', name);
-  const meta = loadMeta(); meta.theme = name; saveMeta(meta);
-}
-
-/* Palette chips — these pick predefined data-theme names */
-const THEME_NAMES = ['white','black','sky','grass','lemon','coral','lavender','mint','sand','slate','rose','navy','blue'];
-
-function renderThemeRow(rowId){
+// --- render one row of swatches tied to a CSS var ---
+function renderRow(rowId, key){
   const row = document.getElementById(rowId);
   row.innerHTML = '';
-  const active = document.body.getAttribute('data-theme') || loadMeta().theme || DEFAULT_THEME;
-
-  for (const name of THEME_NAMES){
-    const chip = document.createElement('button');
-    chip.className = 'dot';
-    chip.setAttribute('aria-label', name);
-    chip.setAttribute('aria-selected', name===active ? 'true' : 'false');
-    chip.style.background = themePreviewColor(name);
-    chip.onclick = ()=>{
-      // Apply the global theme immediately
-      applyThemeName(name);
-      // Update selected styling
-      document.querySelectorAll('.dot[aria-selected="true"]').forEach(d=>d.setAttribute('aria-selected','false'));
-      chip.setAttribute('aria-selected','true');
-    };
-    row.appendChild(chip);
+  const current = getComputedStyle(document.documentElement).getPropertyValue(`--${key}`).trim();
+  for (const c of PALETTE){
+    const b = document.createElement('button');
+    b.className='dot';
+    b.style.background = c.hex;
+    b.title = `${c.name}`;
+    b.setAttribute('aria-selected', (current.toLowerCase()===c.hex.toLowerCase()) ? 'true' : 'false');
+    b.onclick = ()=> pick(key, c.hex);
+    row.appendChild(b);
   }
 }
 
-/* crude preview color swatch per theme name */
-function themePreviewColor(name){
-  switch(name){
-    case 'white': return '#ffffff';
-    case 'black': return '#0b0b0b';
-    case 'sky': return '#4FC3F7';
-    case 'grass': return '#81C784';
-    case 'lemon': return '#FFD54F';
-    case 'coral': return '#FF8A65';
-    case 'lavender': return '#BA68C8';
-    case 'mint': return '#4DB6AC';
-    case 'sand': return '#FBC02D';
-    case 'slate': return '#90A4AE';
-    case 'rose': return '#F48FB1';
-    case 'navy':
-    case 'blue': return '#3949AB';
-    default: return '#e5e7eb';
-  }
+// --- reset to default theme (remove custom overrides) ---
+function resetTheme(){
+  const meta = loadMeta();
+  delete meta.themeCustom;
+  meta.theme = 'blue';               // fallback theme name (uses CSS bodies)
+  saveMeta(meta);
+  // clear inline overrides
+  document.documentElement.style.removeProperty('--bg');
+  document.documentElement.style.removeProperty('--panel');
+  document.documentElement.style.removeProperty('--ink');
+  document.body.setAttribute('data-theme', meta.theme);
+  renderRow('bgRow','bg'); renderRow('panelRow','panel'); renderRow('inkRow','ink');
 }
 
-/* Export/Import (localStorage blob) */
+// --- export/import + wipe (same as before) ---
 function exportSettings(){
   const out = {
     budgeteer_meta: loadMeta(),
@@ -140,54 +135,35 @@ function exportSettings(){
   const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
 }
 function importSettings(){
-  const input = Object.assign(document.createElement('input'), {type:'file', accept:'application/json'});
+  const input = Object.assign(document.createElement('input'),{type:'file', accept:'application/json'});
   input.onchange = async ()=>{
     try{
-      const text = await input.files[0].text();
-      const data = JSON.parse(text);
+      const text = await input.files[0].text(); const data = JSON.parse(text);
       if (data.budgeteer_meta) localStorage.setItem('budgeteer_meta', JSON.stringify(data.budgeteer_meta));
       if (data.budgeteer_expenses) localStorage.setItem('budgeteer_expenses', JSON.stringify(data.budgeteer_expenses));
       if (data.budgeteer_income) localStorage.setItem('budgeteer_income', JSON.stringify(data.budgeteer_income));
       if (data.budgeteer_recurring) localStorage.setItem('budgeteer_recurring', JSON.stringify(data.budgeteer_recurring));
-      // apply imported theme immediately
-      const meta = loadMeta(); document.body.setAttribute('data-theme', meta.theme || DEFAULT_THEME);
-      alert('Imported!');
-      renderThemeRow('bgRow'); renderThemeRow('panelRow'); renderThemeRow('inkRow');
-    }catch(e){ alert('Import failed.'); }
+      // re-apply
+      location.reload();
+    }catch{ alert('Import failed.'); }
   };
   input.click();
 }
-
-/* Danger Zone */
 function wipeAll(){
   if (!confirm('Are you sure?? This deletes all local Budgeteer data.')) return;
   if (!confirm('ARE YOU SURE DUDE?? This cannot be undone.')) return;
-  localStorage.clear();
-  location.reload();
+  localStorage.clear(); location.reload();
 }
 
-/* Back button */
+// --- wire UI ---
 document.getElementById('backBtn').onclick = ()=> history.back();
-
-/* Version text (best effort) */
-document.getElementById('ver').textContent = `Local data • ${new Date().toLocaleString()}`;
-
-/* Wire buttons */
+document.getElementById('resetTheme').onclick = resetTheme;
 document.getElementById('export').onclick = exportSettings;
 document.getElementById('import').onclick = importSettings;
-document.getElementById('resetTheme').onclick = ()=>{
-  applyThemeName(DEFAULT_THEME);
-  renderThemeRow('bgRow'); renderThemeRow('panelRow'); renderThemeRow('inkRow');
-};
 document.getElementById('wipe').onclick = wipeAll;
 
-/* init: apply saved theme and render swatches */
-(function init(){
-  const meta = loadMeta();
-  document.body.setAttribute('data-theme', meta.theme || DEFAULT_THEME);
-  renderThemeRow('bgRow');
-  renderThemeRow('panelRow');
-  renderThemeRow('inkRow');
-})();
+// --- init ---
+document.getElementById('ver').textContent = `Local data • ${new Date().toLocaleString()}`;
+renderRow('bgRow','bg'); renderRow('panelRow','panel'); renderRow('inkRow','ink');
 </script>
 </body></html>
