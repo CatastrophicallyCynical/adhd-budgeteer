@@ -3,7 +3,10 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>About · Budgeteer</title>
   <link rel="stylesheet" href="style.css">
-  <style>.swatches{display:flex; flex-wrap:wrap; gap:8px}.dot{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.2);cursor:pointer}</style>
+<style>
+.swatches{display:flex; flex-wrap:wrap; gap:8px}
+.dot{width:22px;height:22px;border-radius:50%;border:2px solid rgba(0,0,0,.35);box-shadow:inset 0 0 0 2px rgba(255,255,255,.4);cursor:pointer}
+</style>
 </head>
 <body>
 <header>
@@ -138,5 +141,19 @@ document.getElementById('import').addEventListener('click', async ()=>{
   };
   input.click();
 });
+</script>
+  <div class="card">
+  <div style="font-weight:700; margin-bottom:8px">Danger zone</div>
+  <button class="btn" id="wipe">Delete all local data</button>
+</div>
+<script type="module">
+/* ... keep your existing About script ... plus: */
+document.getElementById('wipe').onclick = ()=>{
+  if (!confirm('Are you sure?? This deletes all local Budgeteer data.')) return;
+  if (!confirm('ARE YOU SURE DUDE?? This cannot be undone.')) return;
+  const req = indexedDB.deleteDatabase('gentle-budget');
+  req.onsuccess = ()=> location.reload();
+  req.onerror = ()=> alert('Could not delete database.');
+};
 </script>
 </body></html>
