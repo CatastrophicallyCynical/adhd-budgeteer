@@ -1,7 +1,7 @@
 <!doctype html><html>
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>About</title>
+  <title>About · Budgeteer</title>
   <link rel="stylesheet" href="style.css">
   <style>.swatches{display:flex; flex-wrap:wrap; gap:8px}.dot{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,0,0,.2);cursor:pointer}</style>
 </head>
@@ -18,14 +18,14 @@
       <button class="btn" id="backBtn">Back</button>
     </div>
     <h2>Built with care by James for Cameron</h2>
-    <div><em>love you, brother &lt;3</em></div>
+    <div><em>You're worth every bit of frustration this code was.</em></div>
     <hr>
     <div class="small" id="ver"></div>
   </div>
 
   <div class="card">
-    <div style="font-weight:700; margin-bottom:8px">Theme (phone-friendly)</div>
-    <div class="small" style="margin-bottom:8px">Pick colors for background, panels, and text (from our safe palette).</div>
+    <div style="font-weight:700; margin-bottom:8px">Theme</div>
+    <div class="small" style="margin-bottom:8px">Pick colors for background, panels, and text.</div>
     <div class="row"><div>Background</div><div class="swatches" id="bgSw"></div></div>
     <div class="row"><div>Panels</div><div class="swatches" id="panelSw"></div></div>
     <div class="row"><div>Text</div><div class="swatches" id="inkSw"></div></div>
@@ -52,8 +52,8 @@
 </nav>
 
 <script type="module">
-import { idb } from './db.js';
-await idb.open();
+import { applyTheme } from './theme.js'; await applyTheme();
+import { idb } from './db.js'; await idb.open();
 
 document.getElementById('backBtn').onclick = ()=> history.back();
 
@@ -61,6 +61,7 @@ const meta = await fetch('./appMeta.json').then(r=>r.json());
 document.getElementById('ver').textContent = `Version ${meta.version} • Last updated ${new Date(meta.build_timestamp).toLocaleString()}`;
 
 const PALETTE = [
+  {name:'White',hex:'#FFFFFF'}, {name:'Black',hex:'#000000'},
   {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
   {name:'Coral',hex:'#FF8A65'},{name:'Lavender',hex:'#BA68C8'},{name:'Mint',hex:'#4DB6AC'},
   {name:'Sand',hex:'#FBC02D'},{name:'Slate',hex:'#90A4AE'},{name:'Rose',hex:'#F48FB1'},
@@ -84,9 +85,7 @@ function pick(key, val){
   document.documentElement.style.setProperty(`--${key}`, val);
 }
 
-renderSwatches('bgSw','bg');
-renderSwatches('panelSw','panel');
-renderSwatches('inkSw','ink');
+renderSwatches('bgSw','bg'); renderSwatches('panelSw','panel'); renderSwatches('inkSw','ink');
 
 document.getElementById('saveTheme').onclick = async ()=>{
   const s = (await idb.get('settings','app')) || {};
@@ -103,7 +102,6 @@ document.getElementById('resetTheme').onclick = async ()=>{
   const s = (await idb.get('settings','app')) || {};
   s.themeCustom = { bg:null, panel:null, ink:null };
   await idb.set('settings','app', s);
-  // default
   document.documentElement.style.setProperty('--bg', '#EAE4DC');
   document.documentElement.style.setProperty('--panel', '#ffffff');
   document.documentElement.style.setProperty('--ink', '#1f2937');
@@ -120,7 +118,7 @@ document.getElementById('export').addEventListener('click', async ()=>{
       out[store] = await new Promise((res)=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result); });
     }
     const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
-    const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'gentle-budget-backup.json'}); a.click();
+    const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
   };
 });
 document.getElementById('import').addEventListener('click', async ()=>{
