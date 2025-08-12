@@ -1,25 +1,59 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Add Income</title>
-<link rel="stylesheet" href="style.css">
-</head><body>
+<!doctype html><html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Add Income</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 <div class="container">
   <div class="card">
     <h2>Add Income</h2>
+
     <label>Amount</label>
     <input type="number" id="amount" inputmode="decimal" placeholder="0.00" step="0.01">
-    <label>Bucket</label>
-    <select id="bucket"></select>
+
+    <label>Bucket (optional)</label>
+    <select id="bucket">
+      <option value="">— No bucket (general) —</option>
+    </select>
+
     <label>Note (optional)</label>
-    <input type="text" id="note" placeholder="What did money do?">
+    <input type="text" id="note" placeholder="Paycheck, cash tip, refund…">
+
+    <label style="display:flex; align-items:center; gap:8px; margin-top:8px">
+      <input type="checkbox" id="recurring"> Make this recurring (paycheck)
+    </label>
+    <div id="recurringFields" style="display:none">
+      <label>Cadence</label>
+      <select id="cadence">
+        <option value="biweekly">Biweekly</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="lastday">Last day of month</option>
+      </select>
+
+      <label>Typical payday (date or weekday)</label>
+      <input type="number" id="dueDay" min="1" max="31" placeholder="15">
+
+      <label>Time</label>
+      <input type="time" id="dueTime" value="12:00">
+
+      <label style="display:flex; align-items:center; gap:8px; margin-top:8px">
+        <input type="checkbox" id="confirmPush" checked> Ask me to confirm via notification
+      </label>
+    </div>
+
     <div class="actions">
       <button class="btn primary" id="save">Save</button>
     </div>
   </div>
 </div>
+
 <script type="module">
 import { idb } from './db.js';
 await idb.open();
+
+// buckets (optional target bucket like Savings)
 const sel = document.getElementById('bucket');
 const buckets = await idb.all('buckets');
 for(const b of buckets){
@@ -27,11 +61,61 @@ for(const b of buckets){
   opt.value = b.id; opt.textContent = `${b.emoji} ${b.name}`;
   sel.appendChild(opt);
 }
+
+// toggle recurring UI
+document.getElementById('recurring').addEventListener('change', (e)=>{
+  document.getElementById('recurringFields').style.display = e.target.checked ? 'block' : 'none';
+});
+
 document.getElementById('save').addEventListener('click', async ()=>{
   const amt = parseFloat(document.getElementById('amount').value || '0');
   if(!amt || amt<=0){ alert('Enter amount'); return; }
-  const tx = { id: crypto.randomUUID(), ts: Date.now(), amount: Math.abs(amt), bucketId: sel.value, note: document.getElementById('note').value||'' };
-  const txs = await idb.put('transactions', tx);
+
+  // save income (positive)
+  const tx = {
+    id: crypto.randomUUID(),
+    ts: Date.now(),
+    amount: Math.abs(amt),
+    bucketId: sel.value || null,
+    note: document.getElementById('note').value||''
+  };
+  await idb.put('transactions', tx);
+
+  // optional recurring paycheck
+  if (document.getElementById('recurring').checked){
+    const cadence = document.getElementById('cadence').value;
+    const dueDay = parseInt(document.getElementById('dueDay').value||'15',10);
+    const dueTime = document.getElementById('dueTime').value || '12:00';
+    const confirmPush = document.getElementById('confirmPush').checked;
+
+    const now = new Date();
+    let year = now.getFullYear(), month = now.getMonth();
+    let day = cadence==='lastday' ? new Date(year, month+1, 0).getDate() : dueDay;
+    const [hh,mm] = dueTime.split(':').map(Number);
+    let next = new Date(year, month, day, hh, mm);
+
+    if (next < now) {
+      if (cadence==='weekly')        next = new Date(now.getTime()+7*86400000);
+      else if (cadence==='biweekly') next = new Date(now.getTime()+14*86400000);
+      else { month += 1; next = new Date(year, month, day, hh, mm); }
+    }
+
+    const rec = {
+      id: crypto.randomUUID(),
+      name: document.getElementById('note').value || 'Paycheck',
+      bucketId: sel.value || '', // optional
+      amount: Math.abs(amt),
+      currency: 'USD',
+      cadence: cadence==='lastday' ? 'monthly' : cadence,
+      dayRule: { day: cadence==='lastday' ? 'last' : dueDay },
+      nextDueISO: next.toISOString(),
+      confirmViaPush: confirmPush,
+      autopay: false,
+      type: 'income'
+    };
+    await idb.put('recurring', rec);
+  }
+
   alert('Saved');
   window.close();
 });
