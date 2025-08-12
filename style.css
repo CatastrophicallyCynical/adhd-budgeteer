@@ -1,38 +1,63 @@
 :root{
-  /* theme variables (can be overridden by About page) */
-  --bg:#EAE4DC;       /* light brownish grey */
+  /* App theme (overridden by saved theme via theme.js) */
+  --bg:#EAE4DC;        /* light brownish grey */
   --panel:#ffffff;
   --ink:#1f2937;
   --muted:#6b7280;
 
-  --brand:#3949AB; /* keep brand accent */
-  --chip:#e6eef7;
+  /* Accent */
+  --brand:#3949AB;
 }
 
+/* ---- Base ---- */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
-  background:var(--bg); color:var(--ink);
-  padding-bottom:84px; /* lift content above bottom tab bar */
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji';
+  background:var(--bg);
+  color:var(--ink);
+  padding-bottom:84px; /* keep content above the tab bar */
 }
 
 header{
   position:sticky; top:0; z-index:3;
-  background:var(--panel); border-bottom:1px solid #e5e7eb;
+  background:var(--panel);
+  border-bottom:1px solid #e5e7eb;
   padding:12px 16px;
 }
 .app-title{font-weight:700; font-size:18px}
 .affirmation{color:var(--muted); font-size:14px; margin-top:4px}
 
 .container{max-width:860px; margin:0 auto; padding:16px; padding-bottom:84px}
-.card{background:var(--panel); border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px}
+.card{
+  background:var(--panel);
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:16px;
+}
+.mb-safe{ margin-bottom:120px !important } /* extra bottom space when needed */
+
 .big-number{font-size:36px; font-weight:800}
 .actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
-.btn{border:1px solid #d1d5db; background:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600}
+.btn{
+  border:1px solid #d1d5db; background:#fff;
+  padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600
+}
 .btn.primary{background:var(--brand); color:#fff; border-color:var(--brand)}
+.small{font-size:12px; color:var(--muted)}
+.kbd{font-family:ui-monospace, Menlo, Consolas; font-size:12px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe}
+.row{display:flex; gap:8px; align-items:center; justify-content:space-between}
+label{font-size:14px}
+input[type="time"], input[type="date"], select, input[type="text"], input[type="number"]{
+  width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; background:#fff;
+}
+
 .grid{display:grid; gap:12px}
 .grid.buckets{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+
+/* Buckets */
 .bucket{border-radius:12px; padding:12px; background:#fff; border:1px solid #e5e7eb}
 .bucket .name{font-weight:700; display:flex; align-items:center; gap:8px}
 .bucket .emoji{font-size:22px}
@@ -40,17 +65,16 @@ header{
 .bucket.open .info{display:block}
 .bucket .bar{height:12px; border-radius:6px; background:#edf2f7; margin-top:8px; overflow:hidden}
 .bucket .bar > div{height:100%; width:0%}
-.small{font-size:12px; color:var(--muted)}
-.kbd{font-family:ui-monospace, Menlo, Consolas; font-size:12px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe}
-.row{display:flex; gap:8px; align-items:center; justify-content:space-between}
-label{font-size:14px}
-input[type="time"], select, input[type="text"], input[type="number"]{
-  width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; background:#fff;
+
+/* Toast */
+.toast{
+  position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
+  background:#111827; color:#fff; padding:10px 14px; border-radius:10px;
+  opacity:0; transition:opacity .2s; z-index:60
 }
-.toast{position:fixed; bottom:96px; left:50%; transform:translateX(-50%); background:#111827; color:#fff; padding:10px 14px; border-radius:10px; opacity:0; transition:opacity .2s; z-index:60}
 .toast.show{opacity:1}
 
-/* bottom tab bar (global) */
+/* Bottom Tabs */
 .tabbar{
   position:fixed; left:0; right:0; bottom:0; height:58px;
   background:#111827; display:flex; justify-content:space-around; align-items:center;
@@ -60,8 +84,7 @@ input[type="time"], select, input[type="text"], input[type="number"]{
 .tabbar a{color:#fff; text-decoration:none; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:2px}
 .tabbar .ico{font-size:18px; line-height:18px}
 
-/* phone-friendly cards */
+/* Phone-friendly max width on big screens */
 @media (min-width:760px){
   .tabbar{max-width:860px; margin:0 auto}
-  body{display:block}
 }
