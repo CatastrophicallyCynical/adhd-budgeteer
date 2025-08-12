@@ -26,15 +26,12 @@
   <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
   <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
   <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
+  <a href="history.html"><span class="ico">📜</span><span>History</span></a>
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
-<script type="module">
-  import { applyTheme } from './theme.js';
-  await applyTheme();          // make theme stick before rendering
-  // then load the app
-  import('./app.js');
-</script>
+<!-- boot first, no top-level await -->
+<script type="module" src="./boot.js?v=5"></script>
 <script>
 if ('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js');
