@@ -1,109 +1,133 @@
-// app.js — Budgeteer main logic
+/* Minimal Budgeteer home logic (localStorage-only) */
+const LS = {
+  meta: 'budgeteer_meta',
+  expenses: 'budgeteer_expenses',
+  income: 'budgeteer_income'
+};
 
-let meta = { theme: 'blue', version: 1 };
-let expenses = [];
-let income = [];
-let recurring = [];
+const DEFAULT_BUCKETS = [
+  { id:'bills',     name:'Bills',     emoji:'💡', target:0 },
+  { id:'groceries', name:'Groceries', emoji:'🍎', target:0 },
+  { id:'eatingout', name:'Eating Out',emoji:'🍔', target:0 },
+  { id:'transport', name:'Transport', emoji:'🚌', target:0 },
+  { id:'fun',       name:'Fun',       emoji:'🎮', target:0 },
+  { id:'health',    name:'Health',    emoji:'🏥', target:0 },
+  { id:'kids',      name:'Kids',      emoji:'👶', target:0 },
+  { id:'other',     name:'Other',     emoji:'📦', target:0 },
+  { id:'savings',   name:'Savings',   emoji:'🪙', target:0 },
+];
 
-// --- Utility: Save & Load from localStorage ---
-function saveData() {
-  localStorage.setItem('budgeteer_meta', JSON.stringify(meta));
-  localStorage.setItem('budgeteer_expenses', JSON.stringify(expenses));
-  localStorage.setItem('budgeteer_income', JSON.stringify(income));
-  localStorage.setItem('budgeteer_recurring', JSON.stringify(recurring));
+function load(key, def){ try{ return JSON.parse(localStorage.getItem(key)) ?? def; }catch{ return def; } }
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+function ensureMeta(){
+  const meta = load(LS.meta, { theme:'blue', version:1 });
+  if (!meta.theme) meta.theme = 'blue';
+  save(LS.meta, meta);
+  document.body.setAttribute('data-theme', meta.theme);
+  return meta;
 }
 
-function loadData() {
-  meta = JSON.parse(localStorage.getItem('budgeteer_meta')) || { theme: 'blue', version: 1 };
-  expenses = JSON.parse(localStorage.getItem('budgeteer_expenses')) || [];
-  income = JSON.parse(localStorage.getItem('budgeteer_income')) || [];
-  recurring = JSON.parse(localStorage.getItem('budgeteer_recurring')) || [];
+function ensureBuckets(){
+  const have = load('budgeteer_buckets', null);
+  if (!have){ save('budgeteer_buckets', DEFAULT_BUCKETS); return DEFAULT_BUCKETS; }
+  return have;
 }
 
-// --- Render Buckets & Home Page ---
-function renderBuckets() {
-  const container = document.getElementById('bucketList');
-  if (!container) return;
+function monthRange(Y,M){
+  return [new Date(Y,M,1).getTime(), new Date(Y,M+1,1).getTime()];
+}
+function monthTitle(Y,M){
+  return new Date(Y,M,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+}
 
-  container.innerHTML = '';
-  const buckets = {};
+let CUR_Y = new Date().getFullYear();
+let CUR_M = new Date().getMonth();
 
-  expenses.forEach(e => {
-    if (!buckets[e.category]) buckets[e.category] = [];
-    buckets[e.category].push(e);
+function render(){
+  ensureMeta();
+  const buckets = ensureBuckets();
+  const expenses = load(LS.expenses, []); // [{id, amount(-), bucketId, note, date(YYYY-MM-DD)}]
+  const [start,end] = monthRange(CUR_Y, CUR_M);
+  const monthExp = expenses.filter(e => {
+    const ts = new Date(e.date+'T12:00').getTime();
+    return ts>=start && ts<end;
   });
 
-  Object.keys(buckets).forEach(cat => {
-    const total = buckets[cat].reduce((sum, e) => sum + Number(e.amount), 0);
-    const section = document.createElement('div');
-    section.className = 'bucket-card';
-    section.innerHTML = `
-      <h3>${cat} = $${total.toFixed(2)} this Month</h3>
-      <button onclick="toggleBucket('${cat}')">Expand</button>
-      <div id="bucket-${cat}" class="bucket-items" style="display:none">
-        ${buckets[cat].map((e, i) => `
-          <div class="bucket-item">
-            ${e.name} - $${e.amount} (${e.date})
-            <button onclick="editExpense('${cat}', ${i})">Edit</button>
-          </div>
-        `).join('')}
+  document.getElementById('monthTitle').textContent = monthTitle(CUR_Y, CUR_M);
+
+  const byBucket = Object.fromEntries(buckets.map(b=>[b.id, []]));
+  monthExp.forEach(e => { if (!byBucket[e.bucketId]) byBucket[e.bucketId]=[]; byBucket[e.bucketId].push(e); });
+
+  const list = document.getElementById('bucketList');
+  list.innerHTML = '';
+
+  for(const b of buckets){
+    const items = byBucket[b.id] || [];
+    const total = items.reduce((s,e)=> s + Number(e.amount||0), 0); // amounts should be negative for expenses
+    const card = document.createElement('div');
+    card.className = 'bucket';
+    card.innerHTML = `
+      <div class="row" style="align-items:center">
+        <div class="name"><span class="emoji">${b.emoji}</span> ${b.name}</div>
+        <div class="row" style="gap:8px">
+          <a class="btn" href="expense.html?bucket=${encodeURIComponent(b.id)}">＋</a>
+          <button class="btn" data-expand="${b.id}">▾</button>
+        </div>
+      </div>
+      <div class="small">This month: <b>${(total).toFixed(2)}</b></div>
+      <div class="bar"><div style="width:${Math.min(100, Math.abs(total))}%;"></div></div>
+      <div class="details" id="d-${b.id}" style="display:none; margin-top:8px">
+        ${items.length ? items.map(e=>`
+          <div class="row small">
+            <div>${e.date} • ${(e.note||'—').replace(/</g,'&lt;')}</div>
+            <div style="display:flex; gap:6px; align-items:center">
+              <span>${Number(e.amount).toFixed(2)}</span>
+              <button class="btn" data-edit="${e.id}">Edit</button>
+              <button class="btn" data-del="${e.id}">Delete</button>
+            </div>
+          </div>`).join('') : `<div class="small">No items in ${monthTitle(CUR_Y,CUR_M)}.</div>`}
       </div>
     `;
-    container.appendChild(section);
+    list.appendChild(card);
+  }
+
+  // expand handlers
+  list.querySelectorAll('[data-expand]').forEach(btn=>{
+    btn.onclick = ()=> {
+      const id = btn.getAttribute('data-expand');
+      const el = document.getElementById('d-'+id);
+      el.style.display = (el.style.display==='none'||!el.style.display) ? 'block' : 'none';
+    };
+  });
+
+  // edit/delete
+  list.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute('data-edit');
+      const all = load(LS.expenses, []);
+      const e = all.find(x=>x.id===id); if(!e) return;
+      const amt = Number(prompt('Amount (negative for expense)', e.amount));
+      if (Number.isNaN(amt)) return;
+      const note = prompt('Note', e.note||'') || '';
+      const date = prompt('Date (YYYY-MM-DD)', e.date) || e.date;
+      e.amount = amt; e.note = note; e.date = date;
+      save(LS.expenses, all);
+      render();
+    };
+  });
+  list.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute('data-del');
+      const all = load(LS.expenses, []);
+      const next = all.filter(x=>x.id!==id);
+      save(LS.expenses, next);
+      render();
+    };
   });
 }
 
-function toggleBucket(cat) {
-  const el = document.getElementById(`bucket-${cat}`);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
+document.getElementById('prev').onclick = ()=>{ if(--CUR_M<0){CUR_M=11;CUR_Y--;} render(); };
+document.getElementById('next').onclick = ()=>{ if(++CUR_M>11){CUR_M=0;CUR_Y++;} render(); };
 
-// --- Expense Editing ---
-function editExpense(cat, index) {
-  const exp = expenses.filter(e => e.category === cat)[index];
-  if (!exp) return;
-  const newName = prompt('Edit name:', exp.name);
-  const newAmt = prompt('Edit amount:', exp.amount);
-  if (newName && newAmt) {
-    exp.name = newName;
-    exp.amount = Number(newAmt);
-    saveData();
-    renderBuckets();
-  }
-}
-
-// --- Adding Expense ---
-function addExpense(name, amount, category, date) {
-  expenses.push({ name, amount: Number(amount), category, date });
-  saveData();
-  renderBuckets();
-}
-
-// --- Adding Income ---
-function addIncome(name, amount, date) {
-  income.push({ name, amount: Number(amount), date });
-  saveData();
-}
-
-// --- Theme Handling ---
-function applyTheme(theme) {
-  document.body.setAttribute('data-theme', theme);
-  meta.theme = theme;
-  saveData();
-}
-
-// --- Danger Zone: Delete All Data ---
-function deleteAllData() {
-  if (!confirm('Are you sure??')) return;
-  if (!confirm('ARE YOU SURE DUDE??')) return;
-  localStorage.clear();
-  loadData();
-  renderBuckets();
-}
-
-// --- Init ---
-(function init() {
-  loadData();
-  applyTheme(meta.theme);
-  renderBuckets();
-})();
+(function init(){ render(); })();
