@@ -3,14 +3,6 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Recurring</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    .rowwrap{display:flex; flex-direction:column; gap:8px}
-    .rec-item{display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center}
-    .rec-sub{font-size:12px; color:var(--muted)}
-    .rec-actions{display:flex; gap:6px}
-    .pill{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #cbd5e1}
-    .container{max-width:720px}
-  </style>
 </head>
 <body>
 <header>
@@ -22,9 +14,9 @@
   <div class="card">
     <div class="row" style="justify-content:space-between; align-items:center">
       <div style="font-weight:700">Scheduled bills & paychecks</div>
-      <a class="btn" href="index.html">Done</a>
+      <button class="btn" id="backBtn">Back</button>
     </div>
-    <div id="list" class="rowwrap"></div>
+    <div id="list" class="rowwrap" style="display:flex; flex-direction:column; gap:8px"></div>
   </div>
 </div>
 
@@ -40,10 +32,11 @@
 import { idb } from './db.js';
 await idb.open();
 
+document.getElementById('backBtn').onclick = ()=> history.back();
+
 const buckets = await idb.all('buckets');
 const byId = Object.fromEntries(buckets.map(b=>[b.id,b]));
-
-function money(n){ return (n>=0?'+':'') + n.toFixed(2); }
+const money = (n)=> (n>=0?'+':'') + n.toFixed(2);
 
 async function render(){
   const list = document.getElementById('list');
@@ -56,26 +49,24 @@ async function render(){
     const b = byId[r.bucketId];
     const next = new Date(r.nextDueISO);
     const item = document.createElement('div');
-    item.className = 'rec-item';
-
+    item.className = 'card';
     item.innerHTML = `
-      <div>
-        <div style="font-weight:700">${b ? (b.emoji+' '+b.name) : '—'} • ${r.name || (r.type==='income'?'Paycheck':'Recurring')}</div>
-        <div class="rec-sub">
-          ${r.type==='income'?'Income':'Expense'} · ${money(r.amount)} · next ${next.toLocaleString()}
-          ${r.confirmViaPush ? '<span class="pill">Confirm via push</span>' : ''}
+      <div class="row">
+        <div>
+          <div style="font-weight:700">${b ? (b.emoji+' '+b.name) : '—'} • ${r.name || (r.type==='income'?'Paycheck':'Recurring')}</div>
+          <div class="small">${r.type==='income'?'Income':'Expense'} · ${money(r.amount)} · next ${next.toLocaleString()} ${r.confirmViaPush ? '• Confirm via push' : ''}</div>
         </div>
-      </div>
-      <div class="rec-actions">
-        <button class="btn" data-act="confirm" data-id="${r.id}">Log now</button>
-        <button class="btn" data-act="edit" data-id="${r.id}">Edit</button>
-        <button class="btn" data-act="del" data-id="${r.id}">Delete</button>
+        <div style="display:flex; gap:6px">
+          <button class="btn" data-act="confirm" data-id="${r.id}">Log now</button>
+          <button class="btn" data-act="edit" data-id="${r.id}">Edit</button>
+          <button class="btn" data-act="del" data-id="${r.id}">Delete</button>
+        </div>
       </div>
     `;
     list.appendChild(item);
   }
 
-  list.querySelectorAll('button').forEach(btn=>{
+  list.querySelectorAll('button[data-act]').forEach(btn=>{
     btn.addEventListener('click', (e)=> handleAction(e.currentTarget.dataset));
   });
 }
@@ -99,23 +90,17 @@ async function handleAction({act,id}){
     const input = prompt(`Amount to log for "${r.name}"`, r.amount.toFixed(2));
     if(!input) return;
     const amt = Number(input);
-    const tx = {
-      id: crypto.randomUUID(),
-      ts: Date.now(),
-      amount: (r.type==='income'?+amt:-Math.abs(amt)),
-      bucketId: r.bucketId||'',
-      note: `recurring: ${r.name}`
-    };
+    const tx = { id: crypto.randomUUID(), ts: Date.now(), amount: (r.type==='income'?+amt:-Math.abs(amt)), bucketId: r.bucketId||'', note: `recurring: ${r.name}` };
     await idb.put('transactions', tx);
 
     const next = new Date(r.nextDueISO);
-    if (r.cadence==='weekly')      next.setDate(next.getDate()+7);
+    if (r.cadence==='weekly') next.setDate(next.getDate()+7);
     else if (r.cadence==='biweekly') next.setDate(next.getDate()+14);
-    else /* monthly */             next.setMonth(next.getMonth()+1);
+    else next.setMonth(next.getMonth()+1);
     r.nextDueISO = next.toISOString();
     await idb.put('recurring', r);
 
-    alert('Logged'); render(); return;
+    alert('Logged'); render();
   }
 
   if (act==='edit'){
