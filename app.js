@@ -40,7 +40,10 @@ const DEFAULT_BUCKETS = [
 
 let AFFIRMATIONS = [];
 let meta = null;
+let CURRENT_YEAR = new Date().getFullYear();
+let CURRENT_MONTH = new Date().getMonth(); // 0-11
 
+// ---------- helpers ----------
 async function loadMeta(){
   const [m, a] = await Promise.all([
     fetch('./appMeta.json').then(r=>r.json()),
@@ -50,7 +53,6 @@ async function loadMeta(){
 }
 
 function pickTextColor(bgHex){
-  // YIQ contrast
   const hex = bgHex.replace('#','');
   const r = parseInt(hex.substr(0,2),16);
   const g = parseInt(hex.substr(2,2),16);
@@ -60,11 +62,23 @@ function pickTextColor(bgHex){
 }
 const colorHexByName = (name)=> (COLORS.find(c=>c.name===name)||COLORS[0]).hex;
 
+function monthRange(year, month){
+  // [startMs, endMs)
+  const start = new Date(year, month, 1, 0,0,0,0).getTime();
+  const end   = new Date(year, month+1, 1, 0,0,0,0).getTime();
+  return [start, end];
+}
+function money(n){ return (n>=0?'+':'') + n.toFixed(2); }
+function titleMonth(year, month){
+  return new Date(year, month, 1).toLocaleString(undefined, { month:'long', year:'numeric' });
+}
+
 function toast(msg){
   const t=document.querySelector('.toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 1800);
 }
 
+// ---------- boot/defaults ----------
 async function ensureDefaults(){
   await idb.open();
   let settings = await idb.get('settings','app');
@@ -88,51 +102,76 @@ function renderAffirmation(){
   seen.push(idx); localStorage.setItem('affirm_seen', JSON.stringify(seen));
 }
 
+// ---------- main render ----------
 async function render(){
   const app = document.querySelector('#app');
   const buckets = await idb.all('buckets');
-
-  // totals for progress
   const txs = await idb.all('transactions');
-  const byBucket = Object.fromEntries(buckets.map(b=>[b.id,0]));
-  for(const t of txs){ byBucket[t.bucketId] = (byBucket[t.bucketId]||0) + t.amount; }
 
-  const spendable = '—'; // placeholder until you add cycle math
+  // filter by current month
+  const [start, end] = monthRange(CURRENT_YEAR, CURRENT_MONTH);
+  const monthTxs = txs.filter(t => t.ts >= start && t.ts < end);
+
+  // totals per bucket for this month
+  const totals = Object.fromEntries(buckets.map(b=>[b.id,0]));
+  for(const t of monthTxs){
+    totals[t.bucketId || ''] = (totals[t.bucketId || '']||0) + t.amount;
+  }
 
   app.innerHTML = `
     <div class="card">
-      <div class="row">
+      <div class="row" style="justify-content:space-between; align-items:center">
         <div>
           <div class="app-title">Gentle Budget</div>
           <div class="affirmation"></div>
         </div>
-        <button class="btn" id="btnAbout">About</button>
+        <div class="row" style="gap:6px">
+          <button class="btn" id="prevMonth">◀</button>
+          <div class="kbd">${titleMonth(CURRENT_YEAR, CURRENT_MONTH)}</div>
+          <button class="btn" id="nextMonth">▶</button>
+        </div>
       </div>
-      <div class="big-number">Spendable: ${spendable}</div>
       <div class="actions">
         <button class="btn primary" id="addExpense">Add Expense</button>
         <button class="btn" id="addIncome">Add Income</button>
-        <button class="btn" id="customize">Customize</button>
+        <a class="btn" href="recurring.html">Recurring</a>
+        <a class="btn" href="about.html">About</a>
       </div>
     </div>
 
     <div class="card">
-      <div class="row"><div style="font-weight:700">Buckets</div><div class="small">Tap ⓘ to see what counts</div></div>
+      <div class="row"><div style="font-weight:700">Buckets</div><div class="small">Tap ⓘ to see what counts • Tap a color dot to change</div></div>
       <div class="grid buckets">
         ${buckets.map(b=>{
           const color = colorHexByName(b.color);
-          const text = pickTextColor(color);
-          let spent = -(byBucket[b.id]||0); // expenses negative
-          let pct = b.target>0 ? Math.min(100, Math.max(0, Math.round((spent/b.target)*100))) : 0;
+          const monthTotal = totals[b.id] || 0; // includes +/- (income/expense)
+          const spent = Math.max(0, -monthTotal); // expenses are negative
+          const pct = b.target>0 ? Math.min(100, Math.max(0, Math.round((spent/b.target)*100))) : 0;
+
+          // transactions for this bucket this month
+          const items = monthTxs.filter(t => (t.bucketId||'') === b.id);
+          const list = items.map(t=>{
+            const dt = new Date(t.ts).toLocaleDateString();
+            const note = (t.note||'').replace(/</g,'&lt;');
+            return `<div class="row small"><div>${dt} • ${note||'—'}</div><div>${money(t.amount)}</div></div>`;
+          }).join('');
+
           return `
           <div class="bucket" data-id="${b.id}">
-            <div class="row">
+            <div class="row" style="align-items:center">
               <div class="name"><span class="emoji">${b.emoji}</span> ${b.name}</div>
-              <button class="btn" data-info="${b.id}">ⓘ</button>
+              <div class="row" style="gap:8px">
+                <button class="btn" data-info="${b.id}">ⓘ</button>
+                <button class="btn" data-expand="${b.id}">▾</button>
+              </div>
             </div>
+            <div class="small meta">This month: <b>${money(monthTotal)}</b>${b.target>0 ? ` • Target ${b.target.toFixed(2)}`:''}</div>
             <div class="bar"><div style="width:${pct}%; background:${color}"></div></div>
             <div class="info">${b.info}</div>
-            <div class="row small"><span>Color:</span>
+            <div class="details" id="details-${b.id}" style="display:none; margin-top:8px">
+              ${items.length ? list : `<div class="small">No items in ${titleMonth(CURRENT_YEAR, CURRENT_MONTH)}.</div>`}
+            </div>
+            <div class="row small" style="margin-top:6px"><span>Color:</span>
               <div class="chips">
                 ${COLORS.map(c=>`
                   <span class="chip ${b.color===c.name?'active':''}" title="${c.name}" data-bucket="${b.id}" data-color="${c.name}">
@@ -172,14 +211,30 @@ async function render(){
 
   renderAffirmation();
 
-  // listeners
+  // month nav
+  document.getElementById('prevMonth').onclick = ()=>{ 
+    CURRENT_MONTH--; if (CURRENT_MONTH<0){ CURRENT_MONTH=11; CURRENT_YEAR--; } render(); 
+  };
+  document.getElementById('nextMonth').onclick = ()=>{ 
+    CURRENT_MONTH++; if (CURRENT_MONTH>11){ CURRENT_MONTH=0; CURRENT_YEAR++; } render(); 
+  };
+
+  // info toggles + expand transactions
   document.querySelectorAll('[data-info]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       const id = e.currentTarget.getAttribute('data-info');
       document.querySelector(`.bucket[data-id="${id}"]`).classList.toggle('open');
     });
   });
+  document.querySelectorAll('[data-expand]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-expand');
+      const d = document.getElementById(`details-${id}`);
+      d.style.display = (d.style.display==='none' || !d.style.display) ? 'block' : 'none';
+    });
+  });
 
+  // color changes (re-render on save)
   document.querySelectorAll('.chip').forEach(ch=>{
     ch.addEventListener('click', async (e)=>{
       const id = e.currentTarget.getAttribute('data-bucket');
@@ -193,33 +248,32 @@ async function render(){
     });
   });
 
-  document.getElementById('enablePush').addEventListener('click', async ()=>{
+  // actions
+  document.getElementById('addExpense').onclick = ()=> window.open('expense.html','_blank');
+  document.getElementById('addIncome').onclick  = ()=> window.open('income.html','_blank');
+
+  document.getElementById('enablePush').onclick = async ()=>{
     const res = await ensurePushPermission();
     toast(res.ok ? 'Notifications enabled' : 'Could not enable');
-  });
-
-  document.getElementById('saveDaily').addEventListener('click', async ()=>{
+  };
+  document.getElementById('saveDaily').onclick = async ()=>{
     const t = document.getElementById('dailyTime').value || '10:00';
     const s = await idb.get('settings','app'); s.dailyNudgeEnabled = true; s.dailyNudgeTime = t; await idb.set('settings','app', s);
     toast('Daily nudge saved');
-  });
+  };
 
-  document.getElementById('btnAbout').addEventListener('click', ()=> window.open('about.html','_blank'));
-  document.getElementById('addExpense').addEventListener('click', ()=> window.open('expense.html','_blank'));
-  document.getElementById('addIncome').addEventListener('click', ()=> window.open('income.html','_blank'));
-
-  // Recent activity card (last 5)
-  const recent = [...txs].sort((a,b)=>b.ts-a.ts).slice(0,5);
+  // recent activity card (last 5 across all buckets for this month)
+  const recent = [...monthTxs].sort((a,b)=>b.ts-a.ts).slice(0,5);
   const card = document.createElement('div');
   card.className='card';
   card.innerHTML = `
     <div class="row"><div style="font-weight:700">Recent activity</div>
-      <div class="small">${recent.length? 'Last 5' : 'No activity yet'}</div>
+      <div class="small">${recent.length? 'Last 5 this month' : 'No activity yet'}</div>
     </div>
     ${recent.map(t=>{
       const dt = new Date(t.ts).toLocaleString();
       const amt = (t.amount>=0?'+':'') + t.amount.toFixed(2);
-      return `<div class="row"><div class="small">${dt}</div><div class="small">${amt}</div></div>`;
+      return `<div class="row"><div class="small">${dt} • ${(t.note||'—').replace(/</g,'&lt;')}</div><div class="small">${amt}</div></div>`;
     }).join('')}
   `;
   document.querySelector('#app').appendChild(card);
