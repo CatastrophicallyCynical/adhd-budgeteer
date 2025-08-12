@@ -1,0 +1,61 @@
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>About</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div class="container">
+  <div class="card about">
+    <div style="font-size:36px; line-height:1">❤️</div>
+    <h2>Built with care by James for Cameron</h2>
+    <div><em>love you, brother &lt;3</em></div>
+    <hr>
+    <div class="small" id="ver"></div>
+    <div class="actions" style="justify-content:center">
+      <button class="btn" id="export">Export settings</button>
+      <button class="btn" id="import">Import settings</button>
+    </div>
+  </div>
+</div>
+<script type="module">
+(async function(){
+  const meta = await fetch('./appMeta.json').then(r=>r.json());
+  document.getElementById('ver').textContent = `Version ${meta.version} • Last updated ${new Date(meta.build_timestamp).toLocaleString()}`;
+  document.getElementById('export').addEventListener('click', async ()=>{
+    const db = await indexedDB.open('gentle-budget');
+    db.onsuccess = async ()=>{
+      const d=db.result;
+      const tx=d.transaction(['settings','buckets','transactions','recurring']);
+      const out={};
+      for (const store of ['settings','buckets','transactions','recurring']){
+        out[store] = await new Promise((res)=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result); });
+      }
+      const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+      const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'gentle-budget-backup.json'});
+      a.click();
+    };
+  });
+  document.getElementById('import').addEventListener('click', async ()=>{
+    const input = Object.assign(document.createElement('input'),{type:'file', accept:'application/json'});
+    input.onchange = async ()=>{
+      const text = await input.files[0].text();
+      const data = JSON.parse(text);
+      const dbreq = indexedDB.open('gentle-budget');
+      dbreq.onsuccess = ()=>{
+        const d=dbreq.result;
+        const tx=d.transaction(['settings','buckets','transactions','recurring'],'readwrite');
+        for (const store of ['settings','buckets','transactions','recurring']){
+          const s=tx.objectStore(store);
+          if (store==='settings'){
+            s.put(data.settings?.[0]||data.settings,'app');
+          } else {
+            for (const item of data[store]||[]) s.put(item);
+          }
+        }
+        alert('Imported');
+      };
+    };
+    input.click();
+  });
+})();
+</script>
+</body></html>

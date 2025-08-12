@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gentle Budget</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+<meta name="theme-color" content="#3949AB">
+</head>
+<body>
+<header>
+  <div class="app-title">Gentle Budget</div>
+  <div class="affirmation"></div>
+</header>
+<div class="container" id="app"></div>
+<div class="nav"><button class="btn" id="installBtn" hidden>Install</button></div>
+<script type="module" src="app.js"></script>
+<script>
+// PWA install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt=e; const btn=document.getElementById('installBtn'); btn.hidden=false; btn.onclick=async ()=>{ btn.hidden=true; deferredPrompt.prompt(); deferredPrompt=null; }; });
+// Register service workers
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js');
+  navigator.serviceWorker.register('./firebase-messaging-sw.js');
+}
+</script>
+</body>
+</html>
