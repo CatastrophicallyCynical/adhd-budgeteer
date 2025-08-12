@@ -1,12 +1,15 @@
-<!doctype html><html>
+<!doctype html><html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>About · Budgeteer</title>
   <link rel="stylesheet" href="style.css">
-<style>
-.swatches{display:flex; flex-wrap:wrap; gap:8px}
-.dot{width:22px;height:22px;border-radius:50%;border:2px solid rgba(0,0,0,.35);box-shadow:inset 0 0 0 2px rgba(255,255,255,.4);cursor:pointer}
-</style>
+  <style>
+    .swatches{display:flex; flex-wrap:wrap; gap:8px}
+    /* thicker border so White is visible, inner highlight for dark colors */
+    .dot{width:22px;height:22px;border-radius:50%;
+         border:2px solid rgba(0,0,0,.35); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);
+         cursor:pointer}
+  </style>
 </head>
 <body>
 <header>
@@ -15,8 +18,8 @@
 </header>
 
 <div class="container">
-  <div class="card about">
-    <div style="display:flex; justify-content:space-between; align-items:center">
+  <div class="card">
+    <div class="row" style="align-items:center">
       <div style="font-size:36px; line-height:1">❤️</div>
       <button class="btn" id="backBtn">Back</button>
     </div>
@@ -44,6 +47,12 @@
       <button class="btn" id="import">Import settings</button>
     </div>
   </div>
+
+  <!-- Danger Zone with extra bottom margin so it never hides under the tab bar -->
+  <div class="card mb-safe">
+    <div style="font-weight:700; margin-bottom:8px">Danger zone</div>
+    <button class="btn" id="wipe">Delete all local data</button>
+  </div>
 </div>
 
 <nav class="tabbar">
@@ -51,6 +60,7 @@
   <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
   <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
   <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
+  <a href="history.html"><span class="ico">📜</span><span>History</span></a>
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
@@ -60,9 +70,10 @@ import { idb } from './db.js'; await idb.open();
 
 document.getElementById('backBtn').onclick = ()=> history.back();
 
-const meta = await fetch('./appMeta.json').then(r=>r.json());
+const meta = await fetch('./appMeta.json').then(r=>r.json()).catch(()=>({version:'—',build_timestamp:Date.now()}));
 document.getElementById('ver').textContent = `Version ${meta.version} • Last updated ${new Date(meta.build_timestamp).toLocaleString()}`;
 
+/* Palette (now includes Black & White) */
 const PALETTE = [
   {name:'White',hex:'#FFFFFF'}, {name:'Black',hex:'#000000'},
   {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
@@ -72,8 +83,7 @@ const PALETTE = [
 ];
 
 function renderSwatches(elId, key){
-  const el = document.getElementById(elId);
-  el.innerHTML = '';
+  const el = document.getElementById(elId); el.innerHTML = '';
   for(const c of PALETTE){
     const d = document.createElement('span');
     d.className='dot'; d.title = c.name; d.style.background = c.hex;
@@ -88,7 +98,9 @@ function pick(key, val){
   document.documentElement.style.setProperty(`--${key}`, val);
 }
 
-renderSwatches('bgSw','bg'); renderSwatches('panelSw','panel'); renderSwatches('inkSw','ink');
+renderSwatches('bgSw','bg');
+renderSwatches('panelSw','panel');
+renderSwatches('inkSw','ink');
 
 document.getElementById('saveTheme').onclick = async ()=>{
   const s = (await idb.get('settings','app')) || {};
@@ -111,43 +123,43 @@ document.getElementById('resetTheme').onclick = async ()=>{
   alert('Theme reset');
 };
 
-document.getElementById('export').addEventListener('click', async ()=>{
-  const dbreq = indexedDB.open('gentle-budget');
-  dbreq.onsuccess = async ()=>{
-    const d=dbreq.result;
-    const tx=d.transaction(['settings','buckets','transactions','recurring']);
+/* Export / Import */
+document.getElementById('export').onclick = ()=>{
+  const req = indexedDB.open('gentle-budget');
+  req.onsuccess = ()=>{
+    const db=req.result, tx=db.transaction(['settings','buckets','transactions','recurring']);
     const out={};
-    for (const store of ['settings','buckets','transactions','recurring']){
-      out[store] = await new Promise((res)=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result); });
-    }
-    const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
-    const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
+    const getAll=(store)=>new Promise(res=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result) });
+    Promise.all(['settings','buckets','transactions','recurring'].map(getAll)).then(([settings,buckets,transactions,recurring])=>{
+      out.settings=settings; out.buckets=buckets; out.transactions=transactions; out.recurring=recurring;
+      const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+      const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
+    });
   };
-});
-document.getElementById('import').addEventListener('click', async ()=>{
+};
+
+document.getElementById('import').onclick = ()=>{
   const input = Object.assign(document.createElement('input'),{type:'file', accept:'application/json'});
   input.onchange = async ()=>{
     const text = await input.files[0].text(); const data = JSON.parse(text);
-    const dbreq = indexedDB.open('gentle-budget');
-    dbreq.onsuccess = ()=>{
-      const d=dbreq.result;
-      const tx=d.transaction(['settings','buckets','transactions','recurring'],'readwrite');
-      for (const store of ['settings','buckets','transactions','recurring']){
-        const s=tx.objectStore(store);
-        if (store==='settings'){ s.put(data.settings?.[0]||data.settings,'app'); } else { for (const item of data[store]||[]) s.put(item); }
+    const req = indexedDB.open('gentle-budget');
+    req.onsuccess = ()=>{
+      const db=req.result;
+      const tx=db.transaction(['settings','buckets','transactions','recurring'],'readwrite');
+      const putAll=(store,rows)=>{ const s=tx.objectStore(store); for(const r of rows||[]) s.put(r); };
+      if (Array.isArray(data.settings)) { // legacy export
+        const s=tx.objectStore('settings'); s.put(data.settings[0]||data.settings,'app');
+      } else if (data.settings){
+        const s=tx.objectStore('settings'); s.put(data.settings,'app');
       }
+      putAll('buckets',data.buckets); putAll('transactions',data.transactions); putAll('recurring',data.recurring);
       alert('Imported');
     };
   };
   input.click();
-});
-</script>
-  <div class="card">
-  <div style="font-weight:700; margin-bottom:8px">Danger zone</div>
-  <button class="btn" id="wipe">Delete all local data</button>
-</div>
-<script type="module">
-/* ... keep your existing About script ... plus: */
+};
+
+/* Danger Zone */
 document.getElementById('wipe').onclick = ()=>{
   if (!confirm('Are you sure?? This deletes all local Budgeteer data.')) return;
   if (!confirm('ARE YOU SURE DUDE?? This cannot be undone.')) return;
