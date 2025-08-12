@@ -1,4 +1,5 @@
-<!doctype html><html lang="en">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Budgeteer</title>
@@ -24,10 +25,15 @@
         <a class="btn" href="income.html">Add Income</a>
       </div>
     </div>
+    <!-- New spendable amount line -->
+    <div id="spendableAmount" class="small" style="margin-top:6px; font-weight:700; text-align:center">
+      Spendable: $0.00
+    </div>
   </div>
 
   <div class="card">
-    <div class="row"><div style="font-weight:700">Buckets</div>
+    <div class="row">
+      <div style="font-weight:700">Buckets</div>
       <div class="small">Tap ▾ to see this month’s items • ＋ to add to that bucket</div>
     </div>
     <div id="bucketList" class="grid buckets" style="margin-bottom:72px"></div>
@@ -43,4 +49,5 @@
 </nav>
 
 <script type="module" src="app.js"></script>
-</body></html>
+</body>
+</html>
