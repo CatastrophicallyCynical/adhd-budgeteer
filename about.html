@@ -5,10 +5,11 @@
   <link rel="stylesheet" href="style.css">
   <style>
     .swatches{display:flex; flex-wrap:wrap; gap:8px}
-    /* thicker border so White is visible, inner highlight for dark colors */
-    .dot{width:22px;height:22px;border-radius:50%;
+    /* thick border so White is visible, inner highlight helps dark chips */
+    .dot{width:28px;height:28px;border-radius:50%;
          border:2px solid rgba(0,0,0,.35); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);
          cursor:pointer}
+    .dot[aria-selected="true"]{outline:2px solid #111827; outline-offset:2px}
   </style>
 </head>
 <body>
@@ -31,13 +32,14 @@
 
   <div class="card">
     <div style="font-weight:700; margin-bottom:8px">Theme</div>
-    <div class="small" style="margin-bottom:8px">Pick colors for background, panels, and text.</div>
-    <div class="row"><div>Background</div><div class="swatches" id="bgSw"></div></div>
-    <div class="row"><div>Panels</div><div class="swatches" id="panelSw"></div></div>
-    <div class="row"><div>Text</div><div class="swatches" id="inkSw"></div></div>
+    <div class="small" style="margin-bottom:8px">Tap a color to apply instantly (and save).</div>
+
+    <div class="row"><div>Background</div><div class="swatches" id="bgRow"></div></div>
+    <div class="row"><div>Panels</div><div class="swatches" id="panelRow"></div></div>
+    <div class="row"><div>Text</div><div class="swatches" id="inkRow"></div></div>
+
     <div class="actions" style="justify-content:center; margin-top:12px">
-      <button class="btn" id="saveTheme">Save Theme</button>
-      <button class="btn" id="resetTheme">Reset</button>
+      <button class="btn" id="resetTheme">Reset to default</button>
     </div>
   </div>
 
@@ -64,108 +66,127 @@
   <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
 </nav>
 
-<script type="module">
-import { applyTheme } from './theme.js'; await applyTheme();
-import { idb } from './db.js'; await idb.open();
+<script>
+/* This About page is self-contained. It uses localStorage like your simplified app.js. */
+const THEME_KEY = 'budgeteer_meta';
+const DEFAULT_THEME = 'blue'; // mapped in CSS (alias of navy)
 
-document.getElementById('backBtn').onclick = ()=> history.back();
+function loadMeta(){
+  try{ return JSON.parse(localStorage.getItem(THEME_KEY)) || { theme: DEFAULT_THEME, version: 1 }; }
+  catch{ return { theme: DEFAULT_THEME, version: 1 }; }
+}
+function saveMeta(m){ localStorage.setItem(THEME_KEY, JSON.stringify(m)); }
 
-const meta = await fetch('./appMeta.json').then(r=>r.json()).catch(()=>({version:'—',build_timestamp:Date.now()}));
-document.getElementById('ver').textContent = `Version ${meta.version} • Last updated ${new Date(meta.build_timestamp).toLocaleString()}`;
+function applyThemeName(name){
+  document.body.setAttribute('data-theme', name);
+  const meta = loadMeta(); meta.theme = name; saveMeta(meta);
+}
 
-/* Palette (now includes Black & White) */
-const PALETTE = [
-  {name:'White',hex:'#FFFFFF'}, {name:'Black',hex:'#000000'},
-  {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
-  {name:'Coral',hex:'#FF8A65'},{name:'Lavender',hex:'#BA68C8'},{name:'Mint',hex:'#4DB6AC'},
-  {name:'Sand',hex:'#FBC02D'},{name:'Slate',hex:'#90A4AE'},{name:'Rose',hex:'#F48FB1'},
-  {name:'Navy',hex:'#3949AB'}
-];
+/* Palette chips — these pick predefined data-theme names */
+const THEME_NAMES = ['white','black','sky','grass','lemon','coral','lavender','mint','sand','slate','rose','navy','blue'];
 
-function renderSwatches(elId, key){
-  const el = document.getElementById(elId); el.innerHTML = '';
-  for(const c of PALETTE){
-    const d = document.createElement('span');
-    d.className='dot'; d.title = c.name; d.style.background = c.hex;
-    d.addEventListener('click', ()=> pick(key, c.hex));
-    el.appendChild(d);
+function renderThemeRow(rowId){
+  const row = document.getElementById(rowId);
+  row.innerHTML = '';
+  const active = document.body.getAttribute('data-theme') || loadMeta().theme || DEFAULT_THEME;
+
+  for (const name of THEME_NAMES){
+    const chip = document.createElement('button');
+    chip.className = 'dot';
+    chip.setAttribute('aria-label', name);
+    chip.setAttribute('aria-selected', name===active ? 'true' : 'false');
+    chip.style.background = themePreviewColor(name);
+    chip.onclick = ()=>{
+      // Apply the global theme immediately
+      applyThemeName(name);
+      // Update selected styling
+      document.querySelectorAll('.dot[aria-selected="true"]').forEach(d=>d.setAttribute('aria-selected','false'));
+      chip.setAttribute('aria-selected','true');
+    };
+    row.appendChild(chip);
   }
 }
 
-const picks = { bg:null, panel:null, ink:null };
-function pick(key, val){
-  picks[key] = val;
-  document.documentElement.style.setProperty(`--${key}`, val);
+/* crude preview color swatch per theme name */
+function themePreviewColor(name){
+  switch(name){
+    case 'white': return '#ffffff';
+    case 'black': return '#0b0b0b';
+    case 'sky': return '#4FC3F7';
+    case 'grass': return '#81C784';
+    case 'lemon': return '#FFD54F';
+    case 'coral': return '#FF8A65';
+    case 'lavender': return '#BA68C8';
+    case 'mint': return '#4DB6AC';
+    case 'sand': return '#FBC02D';
+    case 'slate': return '#90A4AE';
+    case 'rose': return '#F48FB1';
+    case 'navy':
+    case 'blue': return '#3949AB';
+    default: return '#e5e7eb';
+  }
 }
 
-renderSwatches('bgSw','bg');
-renderSwatches('panelSw','panel');
-renderSwatches('inkSw','ink');
-
-document.getElementById('saveTheme').onclick = async ()=>{
-  const s = (await idb.get('settings','app')) || {};
-  s.themeCustom = {
-    bg:    picks.bg    || getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
-    panel: picks.panel || getComputedStyle(document.documentElement).getPropertyValue('--panel').trim(),
-    ink:   picks.ink   || getComputedStyle(document.documentElement).getPropertyValue('--ink').trim(),
+/* Export/Import (localStorage blob) */
+function exportSettings(){
+  const out = {
+    budgeteer_meta: loadMeta(),
+    budgeteer_expenses: JSON.parse(localStorage.getItem('budgeteer_expenses')||'[]'),
+    budgeteer_income: JSON.parse(localStorage.getItem('budgeteer_income')||'[]'),
+    budgeteer_recurring: JSON.parse(localStorage.getItem('budgeteer_recurring')||'[]'),
   };
-  await idb.set('settings','app', s);
-  alert('Theme saved');
-};
-
-document.getElementById('resetTheme').onclick = async ()=>{
-  const s = (await idb.get('settings','app')) || {};
-  s.themeCustom = { bg:null, panel:null, ink:null };
-  await idb.set('settings','app', s);
-  document.documentElement.style.setProperty('--bg', '#EAE4DC');
-  document.documentElement.style.setProperty('--panel', '#ffffff');
-  document.documentElement.style.setProperty('--ink', '#1f2937');
-  alert('Theme reset');
-};
-
-/* Export / Import */
-document.getElementById('export').onclick = ()=>{
-  const req = indexedDB.open('gentle-budget');
-  req.onsuccess = ()=>{
-    const db=req.result, tx=db.transaction(['settings','buckets','transactions','recurring']);
-    const out={};
-    const getAll=(store)=>new Promise(res=>{ const s=tx.objectStore(store).getAll(); s.onsuccess=()=>res(s.result) });
-    Promise.all(['settings','buckets','transactions','recurring'].map(getAll)).then(([settings,buckets,transactions,recurring])=>{
-      out.settings=settings; out.buckets=buckets; out.transactions=transactions; out.recurring=recurring;
-      const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
-      const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
-    });
-  };
-};
-
-document.getElementById('import').onclick = ()=>{
-  const input = Object.assign(document.createElement('input'),{type:'file', accept:'application/json'});
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
+  const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'budgeteer-backup.json'}); a.click();
+}
+function importSettings(){
+  const input = Object.assign(document.createElement('input'), {type:'file', accept:'application/json'});
   input.onchange = async ()=>{
-    const text = await input.files[0].text(); const data = JSON.parse(text);
-    const req = indexedDB.open('gentle-budget');
-    req.onsuccess = ()=>{
-      const db=req.result;
-      const tx=db.transaction(['settings','buckets','transactions','recurring'],'readwrite');
-      const putAll=(store,rows)=>{ const s=tx.objectStore(store); for(const r of rows||[]) s.put(r); };
-      if (Array.isArray(data.settings)) { // legacy export
-        const s=tx.objectStore('settings'); s.put(data.settings[0]||data.settings,'app');
-      } else if (data.settings){
-        const s=tx.objectStore('settings'); s.put(data.settings,'app');
-      }
-      putAll('buckets',data.buckets); putAll('transactions',data.transactions); putAll('recurring',data.recurring);
-      alert('Imported');
-    };
+    try{
+      const text = await input.files[0].text();
+      const data = JSON.parse(text);
+      if (data.budgeteer_meta) localStorage.setItem('budgeteer_meta', JSON.stringify(data.budgeteer_meta));
+      if (data.budgeteer_expenses) localStorage.setItem('budgeteer_expenses', JSON.stringify(data.budgeteer_expenses));
+      if (data.budgeteer_income) localStorage.setItem('budgeteer_income', JSON.stringify(data.budgeteer_income));
+      if (data.budgeteer_recurring) localStorage.setItem('budgeteer_recurring', JSON.stringify(data.budgeteer_recurring));
+      // apply imported theme immediately
+      const meta = loadMeta(); document.body.setAttribute('data-theme', meta.theme || DEFAULT_THEME);
+      alert('Imported!');
+      renderThemeRow('bgRow'); renderThemeRow('panelRow'); renderThemeRow('inkRow');
+    }catch(e){ alert('Import failed.'); }
   };
   input.click();
-};
+}
 
 /* Danger Zone */
-document.getElementById('wipe').onclick = ()=>{
+function wipeAll(){
   if (!confirm('Are you sure?? This deletes all local Budgeteer data.')) return;
   if (!confirm('ARE YOU SURE DUDE?? This cannot be undone.')) return;
-  const req = indexedDB.deleteDatabase('gentle-budget');
-  req.onsuccess = ()=> location.reload();
-  req.onerror = ()=> alert('Could not delete database.');
+  localStorage.clear();
+  location.reload();
+}
+
+/* Back button */
+document.getElementById('backBtn').onclick = ()=> history.back();
+
+/* Version text (best effort) */
+document.getElementById('ver').textContent = `Local data • ${new Date().toLocaleString()}`;
+
+/* Wire buttons */
+document.getElementById('export').onclick = exportSettings;
+document.getElementById('import').onclick = importSettings;
+document.getElementById('resetTheme').onclick = ()=>{
+  applyThemeName(DEFAULT_THEME);
+  renderThemeRow('bgRow'); renderThemeRow('panelRow'); renderThemeRow('inkRow');
 };
+document.getElementById('wipe').onclick = wipeAll;
+
+/* init: apply saved theme and render swatches */
+(function init(){
+  const meta = loadMeta();
+  document.body.setAttribute('data-theme', meta.theme || DEFAULT_THEME);
+  renderThemeRow('bgRow');
+  renderThemeRow('panelRow');
+  renderThemeRow('inkRow');
+})();
 </script>
 </body></html>
