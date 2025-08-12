@@ -44,6 +44,7 @@
 </nav>
 
 <script type="module">
+/* Minimal Budgeteer home logic (localStorage-only) + robust edit/delete */
 const LS = { expenses:'budgeteer_expenses', buckets:'budgeteer_buckets' };
 const DEFAULT_BUCKETS = [
   { id:'bills',name:'Bills',emoji:'💡'},{ id:'groceries',name:'Groceries',emoji:'🍎'},
@@ -54,7 +55,21 @@ const DEFAULT_BUCKETS = [
 ];
 function load(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } }
 function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+
 function ensureBuckets(){ const b=load(LS.buckets,null); if(!b){ save(LS.buckets,DEFAULT_BUCKETS); return DEFAULT_BUCKETS; } return b; }
+
+/* --- MIGRATION: give every expense an id if missing --- */
+function migrate(){
+  const exps = load(LS.expenses, []);
+  let touched = false;
+  for (const e of exps){
+    if (!e.id) { e.id = (crypto?.randomUUID?.() || String(Date.now())+Math.random().toString(16).slice(2)); touched = true; }
+    if (typeof e.amount === 'string') { e.amount = Number(e.amount)||0; touched = true; }
+  }
+  if (touched) save(LS.expenses, exps);
+}
+migrate();
+
 function range(y,m){ return [new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()]; }
 function title(y,m){ return new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
 
@@ -89,18 +104,55 @@ function render(){
       <div class="details" id="d-${b.id}" style="display:none; margin-top:8px">
         ${
           items.length ? items.map(x=>`
-            <div class="row small">
+            <div class="row small" data-item="${x.id}">
               <div>${x.date||'—'} • ${(x.note||'—').replace(/</g,'&lt;')}</div>
-              <div>${Number(x.amount).toFixed(2)}</div>
+              <div style="display:flex; gap:6px; align-items:center">
+                <span>${Number(x.amount).toFixed(2)}</span>
+                <button class="btn" data-edit="${x.id}">Edit</button>
+                <button class="btn" data-del="${x.id}">Delete</button>
+              </div>
             </div>`).join('') : `<div class="small">No items in ${title(Y,M)}.</div>`
         }
       </div>`;
     list.appendChild(card);
   }
+
+  // expand
   list.querySelectorAll('[data-expand]').forEach(btn=>{
     btn.onclick = ()=>{ const id=btn.getAttribute('data-expand'); const el=document.getElementById('d-'+id); el.style.display = (el.style.display==='none'||!el.style.display)?'block':'none'; };
   });
+
+  // edit
+  list.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute('data-edit');
+      const all = load(LS.expenses, []);
+      const idx = all.findIndex(x=>x.id===id);
+      if (idx<0) return;
+      const cur = all[idx];
+      const amt = Number(prompt('Amount (negative for expense)', cur.amount));
+      if (Number.isNaN(amt)) return;
+      const note = prompt('Note', cur.note||'') || '';
+      const date = prompt('Date (YYYY-MM-DD)', cur.date || new Date().toISOString().slice(0,10)) || cur.date;
+      all[idx] = {...cur, amount: amt, note, date};
+      save(LS.expenses, all);
+      render();
+    };
+  });
+
+  // delete
+  list.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute('data-del');
+      if (!confirm('Delete this item?')) return;
+      const all = load(LS.expenses, []);
+      const next = all.filter(x=>x.id!==id);
+      save(LS.expenses, next);
+      render();
+    };
+  });
 }
+
 render();
 </script>
 </body></html>
