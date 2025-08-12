@@ -103,6 +103,9 @@ function renderAffirmation(){
 async function render(){
   const app = document.querySelector('#app');
   const buckets = await idb.all('buckets');
+  const txs = await idb.all('transactions');
+const byBucket = Object.fromEntries(buckets.map(b=>[b.id,0]));
+for (const t of txs) { byBucket[t.bucketId] = (byBucket[t.bucketId]||0) + t.amount; }
   // compute spendable = sum of positive income - expenses this cycle (placeholder demo)
   const spendable = '—';
   app.innerHTML = `
@@ -139,7 +142,9 @@ async function render(){
             <div class="info">${b.info}</div>
             <div class="row small"><span>Color:</span>
               <div class="chips">
-                ${COLORS.map(c=>`<span class="chip ${b.color===c.name?'active':''}" data-bucket="${b.id}" data-color="${c.name}" style="border-color:${c.hex}; background: ${c.hex}; color:${pickTextColor(c.hex)}">${c.name}</span>`).join('')}
+                ${COLORS.map(c=>`<span class="chip ${b.color===c.name?'active':''}" title="${c.name}" data-bucket="${b.id}" data-color="${c.name}">
+  <span class="color-dot" style="background:${c.hex}"></span>
+</span>`).join('')}
               </div>
             </div>
           </div>`;
