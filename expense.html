@@ -1,6 +1,6 @@
 <!doctype html><html>
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Add Expense</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -11,6 +11,9 @@
 
     <label>Amount</label>
     <input type="number" id="amount" inputmode="decimal" placeholder="0.00" step="0.01">
+
+    <label>Date</label>
+    <input type="date" id="date">
 
     <label>Bucket</label>
     <select id="bucket"></select>
@@ -47,11 +50,23 @@
   </div>
 </div>
 
+<nav class="tabbar">
+  <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
+  <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
+  <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
+  <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
+  <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
+</nav>
+
 <script type="module">
+import { applyTheme } from './theme.js'; await applyTheme();
 import { idb } from './db.js';
 await idb.open();
 
-// bucket options
+// set default date to today
+document.getElementById('date').value = new Date().toISOString().slice(0,10);
+
+// buckets + preselect from ?bucket=
 const sel = document.getElementById('bucket');
 const buckets = await idb.all('buckets');
 for(const b of buckets){
@@ -59,8 +74,10 @@ for(const b of buckets){
   opt.value = b.id; opt.textContent = `${b.emoji} ${b.name}`;
   sel.appendChild(opt);
 }
+const qs = new URLSearchParams(location.search);
+const pre = qs.get('bucket'); if (pre) sel.value = pre;
 
-// recurring UI toggle
+// recurring UI
 document.getElementById('recurring').addEventListener('change', (e)=>{
   document.getElementById('recurringFields').style.display = e.target.checked ? 'block' : 'none';
 });
@@ -69,17 +86,12 @@ document.getElementById('save').addEventListener('click', async ()=>{
   const amt = parseFloat(document.getElementById('amount').value || '0');
   if(!amt || amt<=0){ alert('Enter amount'); return; }
 
-  // save expense
-  const tx = {
-    id: crypto.randomUUID(),
-    ts: Date.now(),
-    amount: -Math.abs(amt),
-    bucketId: sel.value,
-    note: document.getElementById('note').value||''
-  };
+  const [Y,M,D] = (document.getElementById('date').value || new Date().toISOString().slice(0,10)).split('-').map(Number);
+  const ts = new Date(Y, M-1, D, 12, 0).getTime();
+
+  const tx = { id: crypto.randomUUID(), ts, amount: -Math.abs(amt), bucketId: sel.value, note: document.getElementById('note').value||'' };
   await idb.put('transactions', tx);
 
-  // optional recurring record
   if (document.getElementById('recurring').checked){
     const cadence = document.getElementById('cadence').value;
     const dueDay = parseInt(document.getElementById('dueDay').value||'15',10);
@@ -91,9 +103,8 @@ document.getElementById('save').addEventListener('click', async ()=>{
     let day = cadence==='lastday' ? new Date(year, month+1, 0).getDate() : dueDay;
     const [hh,mm] = dueTime.split(':').map(Number);
     let next = new Date(year, month, day, hh, mm);
-
     if (next < now) {
-      if (cadence==='weekly')      next = new Date(now.getTime()+7*86400000);
+      if (cadence==='weekly')        next = new Date(now.getTime()+7*86400000);
       else if (cadence==='biweekly') next = new Date(now.getTime()+14*86400000);
       else { month += 1; next = new Date(year, month, day, hh, mm); }
     }
