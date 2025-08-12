@@ -10,33 +10,27 @@ const DEFAULT_SETTINGS = {
   affirmationsInApp: true,
   affirmationsInPush: true,
   themePreset: 'breeze',
-  themeCustom: { bg:null, panel:null, ink:null }, // set on About page
+  themeCustom: { bg:null, panel:null, ink:null },
   version: null,
 };
 
 const COLORS = [
-  {name:'Sky',      hex:'#4FC3F7'},
-  {name:'Grass',    hex:'#81C784'},
-  {name:'Lemon',    hex:'#FFD54F'},
-  {name:'Coral',    hex:'#FF8A65'},
-  {name:'Lavender', hex:'#BA68C8'},
-  {name:'Mint',     hex:'#4DB6AC'},
-  {name:'Sand',     hex:'#FBC02D'},
-  {name:'Slate',    hex:'#90A4AE'},
-  {name:'Rose',     hex:'#F48FB1'},
-  {name:'Navy',     hex:'#3949AB'},
+  {name:'Sky',hex:'#4FC3F7'},{name:'Grass',hex:'#81C784'},{name:'Lemon',hex:'#FFD54F'},
+  {name:'Coral',hex:'#FF8A65'},{name:'Lavender',hex:'#BA68C8'},{name:'Mint',hex:'#4DB6AC'},
+  {name:'Sand',hex:'#FBC02D'},{name:'Slate',hex:'#90A4AE'},{name:'Rose',hex:'#F48FB1'},
+  {name:'Navy',hex:'#3949AB'}
 ];
 
 const DEFAULT_BUCKETS = [
-  { id:'groceries', name:'Groceries', emoji:'🍎', color:'Sky',      target:0, rollover:true,  info:'Food you buy to make at home. Supermarket runs, farmer’s markets, snacks to eat later. Not takeout.' },
-  { id:'eatingout', name:'Eating Out',emoji:'🍔', color:'Coral',    target:0, rollover:false, info:'Meals ready to eat now. Restaurants, takeout, coffee shops, food trucks.' },
-  { id:'transport', name:'Transport', emoji:'🚌', color:'Grass',    target:0, rollover:true,  info:'Getting from point A to B. Gas, fares, rideshares, tolls, parking, repairs.' },
-  { id:'bills',     name:'Bills',     emoji:'💡', color:'Slate',    target:0, rollover:false, info:'Regular payments. Rent/mortgage, utilities, phone/internet, insurance, subscriptions.' },
-  { id:'fun',       name:'Fun',       emoji:'🎮', color:'Lemon',    target:0, rollover:true,  info:'Things you do just because. Games, hobbies, movies, music, trips, treats.' },
-  { id:'other',     name:'Other',     emoji:'📦', color:'Sand',     target:0, rollover:true,  info:'Doesn’t fit elsewhere. One-off purchases, surprises, gifts.' },
-  { id:'savings',   name:'Savings',   emoji:'🪙', color:'Mint',     target:0, rollover:true,  info:'Money Future-You will thank you for. Emergency fund, planned big purchases, extra debt payments.' },
+  { id:'groceries', name:'Groceries', emoji:'🍎', color:'Sky', target:0, rollover:true,  info:'Food you buy to make at home. Supermarket runs, farmer’s markets, snacks to eat later. Not takeout.' },
+  { id:'eatingout', name:'Eating Out',emoji:'🍔', color:'Coral', target:0, rollover:false, info:'Meals ready to eat now. Restaurants, takeout, coffee shops, food trucks.' },
+  { id:'transport', name:'Transport', emoji:'🚌', color:'Grass', target:0, rollover:true,  info:'Getting from point A to B. Gas, fares, rideshares, tolls, parking, repairs.' },
+  { id:'bills',     name:'Bills',     emoji:'💡', color:'Slate', target:0, rollover:false, info:'Regular payments. Rent/mortgage, utilities, phone/internet, insurance, subscriptions.' },
+  { id:'fun',       name:'Fun',       emoji:'🎮', color:'Lemon', target:0, rollover:true,  info:'Things you do just because. Games, hobbies, movies, music, trips, treats.' },
+  { id:'other',     name:'Other',     emoji:'📦', color:'Sand', target:0, rollover:true,  info:'Doesn’t fit elsewhere. One-off purchases, surprises, gifts.' },
+  { id:'savings',   name:'Savings',   emoji:'🪙', color:'Mint', target:0, rollover:true,  info:'Money Future-You will thank you for. Emergency fund, planned big purchases, extra debt payments.' },
   { id:'health',    name:'Health',    emoji:'🏥', color:'Lavender', target:0, rollover:true,  info:'Taking care of body and mind. Doctor, prescriptions, therapy, OTC meds, gym.' },
-  { id:'kids',      name:'Kids',      emoji:'👶', color:'Rose',     target:0, rollover:true,  info:'Little humans: clothes, toys, school supplies, childcare, activities.' },
+  { id:'kids',      name:'Kids',      emoji:'👶', color:'Rose', target:0, rollover:true,  info:'Little humans: clothes, toys, school supplies, childcare, activities.' },
 ];
 
 let AFFIRMATIONS = [];
@@ -44,7 +38,6 @@ let meta = null;
 let CURRENT_YEAR = new Date().getFullYear();
 let CURRENT_MONTH = new Date().getMonth(); // 0..11
 
-// ---------- helpers ----------
 async function loadMeta(){
   const [m, a] = await Promise.all([
     fetch('./appMeta.json').then(r=>r.json()),
@@ -53,38 +46,22 @@ async function loadMeta(){
   meta = m; AFFIRMATIONS = a;
 }
 
-function colorHexByName(name){ return (COLORS.find(c=>c.name===name)||COLORS[0]).hex; }
-function monthRange(year, month){ return [new Date(year,month,1).getTime(), new Date(year,month+1,1).getTime()]; }
+function monthRange(y, m){ return [new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()]; }
 function money(n){ return (n>=0?'+':'') + n.toFixed(2); }
-function titleMonth(year, month){ return new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
+function titleMonth(y,m){ return new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'}); }
+const colorHexByName = (n)=> (COLORS.find(c=>c.name===n)||COLORS[0]).hex;
 
 function toast(msg){
   const t=document.querySelector('.toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 1800);
 }
 
-// ---------- theme apply ----------
-async function applyTheme(){
-  await idb.open();
-  const s = (await idb.get('settings','app')) || DEFAULT_SETTINGS;
-  const t = s.themeCustom || {};
-  if (t.bg)   document.documentElement.style.setProperty('--bg', t.bg);
-  if (t.panel)document.documentElement.style.setProperty('--panel', t.panel);
-  if (t.ink)  document.documentElement.style.setProperty('--ink', t.ink);
-}
-
-// ---------- boot ----------
 async function ensureDefaults(){
   await idb.open();
   let settings = await idb.get('settings','app');
-  if(!settings){
-    settings = {...DEFAULT_SETTINGS, version: meta?.version || '0.1.0' };
-    await idb.set('settings','app', settings);
-  }
+  if(!settings){ settings = {...DEFAULT_SETTINGS, version: meta?.version || '0.1.0' }; await idb.set('settings','app', settings); }
   let buckets = await idb.all('buckets');
-  if(!buckets || !buckets.length){
-    await Promise.all(DEFAULT_BUCKETS.map(b=>idb.put('buckets', b)));
-  }
+  if(!buckets || !buckets.length){ await Promise.all(DEFAULT_BUCKETS.map(b=>idb.put('buckets', b))); }
 }
 
 function renderAffirmation(){
@@ -97,27 +74,21 @@ function renderAffirmation(){
   seen.push(idx); localStorage.setItem('affirm_seen', JSON.stringify(seen));
 }
 
-// ---------- main render ----------
 async function render(){
   const app = document.querySelector('#app');
   const buckets = await idb.all('buckets');
   const txs = await idb.all('transactions');
 
-  // month filter
   const [start, end] = monthRange(CURRENT_YEAR, CURRENT_MONTH);
   const monthTxs = txs.filter(t => t.ts >= start && t.ts < end);
-
-  // totals per bucket for this month
   const totals = Object.fromEntries(buckets.map(b=>[b.id,0]));
-  for(const t of monthTxs){
-    totals[t.bucketId || ''] = (totals[t.bucketId || '']||0) + t.amount;
-  }
+  for(const t of monthTxs){ totals[t.bucketId || ''] = (totals[t.bucketId || '']||0) + t.amount; }
 
   app.innerHTML = `
     <div class="card">
       <div class="row" style="justify-content:space-between; align-items:center">
         <div>
-          <div class="app-title">Gentle Budget</div>
+          <div class="app-title">Budgeteer</div>
           <div class="affirmation"></div>
         </div>
         <div class="row" style="gap:6px">
@@ -136,7 +107,7 @@ async function render(){
 
     <div class="card">
       <div class="row"><div style="font-weight:700">Buckets</div>
-        <div class="small">Tap ⓘ to see what counts • Tap ▾ to view entries</div>
+        <div class="small">Tap ⓘ to see what counts • Tap ▾ to view entries • Tap ＋ to add to that bucket</div>
       </div>
       <div class="grid buckets" style="margin-bottom:72px">
         ${buckets.map(b=>{
@@ -165,7 +136,8 @@ async function render(){
             <div class="row" style="align-items:center">
               <div class="name"><span class="emoji">${b.emoji}</span> ${b.name}</div>
               <div class="row" style="gap:8px">
-                <button class="btn" data-target="${b.id}">🎯 Target</button>
+                <button class="btn" data-add="${b.id}">＋</button>
+                <button class="btn" data-target="${b.id}">🎯</button>
                 <button class="btn" data-info="${b.id}">ⓘ</button>
                 <button class="btn" data-expand="${b.id}">▾</button>
               </div>
@@ -226,7 +198,15 @@ async function render(){
     });
   });
 
-  // edit/delete transactions
+  // per-bucket add (preselect bucket via query param)
+  document.querySelectorAll('[data-add]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-add');
+      window.open(`expense.html?bucket=${encodeURIComponent(id)}`,'_blank');
+    });
+  });
+
+  // edit/delete transactions (re-render only, no hard reload)
   document.querySelectorAll('[data-edit]').forEach(btn=>{
     btn.addEventListener('click', async (e)=>{
       const id = e.currentTarget.getAttribute('data-edit');
@@ -258,7 +238,7 @@ async function render(){
     });
   });
 
-  // set target per bucket
+  // targets
   document.querySelectorAll('[data-target]').forEach(btn=>{
     btn.addEventListener('click', async (e)=>{
       const id = e.currentTarget.getAttribute('data-target');
@@ -266,8 +246,7 @@ async function render(){
       const b = list.find(x=>x.id===id);
       const v = prompt(`Monthly target for ${b.name}`, b.target||0);
       if (v===null) return;
-      const n = Number(v)||0;
-      b.target = n;
+      b.target = Number(v)||0;
       await idb.put('buckets', b);
       toast('Target saved'); render();
     });
@@ -283,15 +262,4 @@ async function render(){
   };
   document.getElementById('saveDaily').onclick = async ()=>{
     const t = document.getElementById('dailyTime').value || '10:00';
-    const s = await idb.get('settings','app'); s.dailyNudgeEnabled = true; s.dailyNudgeTime = t; await idb.set('settings','app', s);
-    toast('Daily nudge saved');
-  };
-}
-
-(async function init(){
-  await loadMeta();
-  await ensureDefaults();
-  await applyTheme();
-  await render();
-  listenForegroundMessages();
-})();
+    const s = await idb.get('settings','app'); s.dailyNudgeEnabled = true; s.
