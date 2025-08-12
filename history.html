@@ -1,0 +1,114 @@
+<!doctype html><html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>History · Budgeteer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="app-title">History</div>
+  <div class="affirmation small"></div>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="row" style="align-items:center">
+      <button class="btn" id="backBtn">Back</button>
+      <div class="row" style="gap:8px">
+        <button class="btn" id="prev">◀</button>
+        <div class="kbd" id="monthTitle"></div>
+        <button class="btn" id="next">▶</button>
+      </div>
+      <select id="type">
+        <option value="all">All</option>
+        <option value="income">Income</option>
+        <option value="expense">Expenses</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card" id="list"></div>
+</div>
+
+<nav class="tabbar">
+  <a href="index.html"><span class="ico">🏠</span><span>Home</span></a>
+  <a href="expense.html"><span class="ico">➖</span><span>Expense</span></a>
+  <a href="income.html"><span class="ico">➕</span><span>Income</span></a>
+  <a href="recurring.html"><span class="ico">🔁</span><span>Recurring</span></a>
+  <a href="history.html"><span class="ico">📜</span><span>History</span></a>
+  <a href="about.html"><span class="ico">⚙️</span><span>About</span></a>
+</nav>
+
+<script type="module">
+import { applyTheme } from './theme.js'; await applyTheme();
+import { idb } from './db.js'; await idb.open();
+
+const money = n => (n>=0?'+':'') + n.toFixed(2);
+const range = (y,m)=>[new Date(y,m,1).getTime(), new Date(y,m+1,1).getTime()];
+const title = (y,m)=> new Date(y,m,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+
+let Y=new Date().getFullYear(), M=new Date().getMonth();
+document.getElementById('backBtn').onclick = ()=> history.back();
+
+document.getElementById('prev').onclick = ()=>{ if(--M<0){M=11;Y--;} render(); };
+document.getElementById('next').onclick = ()=>{ if(++M>11){M=0;Y++;} render(); };
+document.getElementById('type').onchange = ()=> render();
+
+async function render(){
+  document.getElementById('monthTitle').textContent = title(Y,M);
+  const [s,e] = range(Y,M);
+  const txs = (await idb.all('transactions')).filter(t=> t.ts>=s && t.ts<e);
+  const filter = document.getElementById('type').value;
+  const filtered = txs.filter(t=> filter==='all' ? true : (filter==='income'? t.amount>0 : t.amount<0));
+  filtered.sort((a,b)=>b.ts-a.ts);
+
+  const buckets = await idb.all('buckets');
+  const byId = Object.fromEntries(buckets.map(b=>[b.id,b]));
+  const list = document.getElementById('list');
+  list.innerHTML = filtered.length ? '' : '<div class="small">No entries.</div>';
+
+  for(const t of filtered){
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.style.borderTop = '1px solid #e5e7eb';
+    div.style.padding = '8px 0';
+    const b = byId[t.bucketId||''];
+    div.innerHTML = `
+      <div class="small">${new Date(t.ts).toLocaleString()} • ${(b?b.emoji+' '+b.name:'—')} • ${(t.note||'—').replace(/</g,'&lt;')}</div>
+      <div class="row">
+        <div class="small">${money(t.amount)}</div>
+        <button class="btn" data-edit="${t.id}">Edit</button>
+        <button class="btn" data-del="${t.id}">Delete</button>
+      </div>
+    `;
+    list.appendChild(div);
+  }
+
+  // edit/delete
+  list.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.getAttribute('data-edit');
+      const all = await idb.all('transactions'); const t = all.find(x=>x.id===id); if(!t) return;
+      const amt = Number(prompt('Amount', t.amount)); if (isNaN(amt)) return;
+      const note = prompt('Note', t.note||'') || '';
+      const when = prompt('Date (YYYY-MM-DD)', new Date(t.ts).toISOString().slice(0,10));
+      let ts = t.ts;
+      if (when){ const [Y2,M2,D2]=when.split('-').map(Number); ts=new Date(Y2,M2-1,D2,12,0).getTime(); }
+      await idb.put('transactions', {...t, amount: amt, note, ts});
+      render();
+    };
+  });
+  list.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.getAttribute('data-del');
+      const req = indexedDB.open('gentle-budget');
+      req.onsuccess = ()=> {
+        const d=req.result;
+        d.transaction('transactions','readwrite').objectStore('transactions').delete(id).onsuccess=()=>render();
+      };
+    };
+  });
+}
+render();
+</script>
+</body></html>
