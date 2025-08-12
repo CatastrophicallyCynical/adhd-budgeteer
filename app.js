@@ -131,3 +131,79 @@ document.getElementById('prev').onclick = ()=>{ if(--CUR_M<0){CUR_M=11;CUR_Y--;}
 document.getElementById('next').onclick = ()=>{ if(++CUR_M>11){CUR_M=0;CUR_Y++;} render(); };
 
 (function init(){ render(); })();
+// ===== Spendable summary (Income - Expenses excluding Savings) =====
+(function(){
+  const LS_INC = 'budgeteer_income';
+  const LS_EXP = 'budgeteer_expenses';
+  const SAVINGS_IDS = new Set(['savings']); // update if you use a different id
+
+  const fmt = n => (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const load = (k,d)=>{ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } };
+
+  function parseMonthFromTitle(){
+    // Expecting something like "August 2025"
+    const el = document.getElementById('monthTitle');
+    if (!el) return { y:new Date().getFullYear(), m:new Date().getMonth() };
+    const txt = (el.textContent || '').trim();
+    const d = new Date(txt+' 1'); // "August 2025 1" -> first of that month
+    if (isNaN(d.getTime())) return { y:new Date().getFullYear(), m:new Date().getMonth() };
+    return { y: d.getFullYear(), m: d.getMonth() };
+  }
+
+  function monthRange(y,m){
+    const start = new Date(y, m, 1).getTime();
+    const end   = new Date(y, m+1, 1).getTime();
+    return [start, end];
+  }
+
+  function renderSpendable(){
+    const out = document.getElementById('spendableAmount');
+    if (!out) return;
+
+    const { y, m } = parseMonthFromTitle();
+    const [s,e] = monthRange(y,m);
+
+    const inc = load(LS_INC, []);
+    const exp = load(LS_EXP, []);
+
+    const monthInc = inc.filter(x=>{
+      const ts = new Date((x.date||'') + 'T12:00').getTime();
+      return ts>=s && ts<e;
+    });
+
+    const monthExp = exp.filter(x=>{
+      const ts = new Date((x.date||'') + 'T12:00').getTime();
+      return ts>=s && ts<e;
+    });
+
+    const incomeTotal = monthInc.reduce((sum,x)=> sum + (Number(x.amount)||0), 0);
+
+    // Expenses: exclude savings buckets; treat amounts as magnitude of spend
+    const spendNonSavings = monthExp
+      .filter(x => !SAVINGS_IDS.has(x.bucketId))
+      .reduce((sum,x)=>{
+        const a = Number(x.amount)||0;
+        return sum + (a<0 ? -a : Math.abs(a));
+      }, 0);
+
+    const spendable = incomeTotal - spendNonSavings;
+
+    out.innerHTML = `
+      <b>Spendable:</b> $${fmt(spendable)}
+      &nbsp;•&nbsp; <span class="small">Income: $${fmt(incomeTotal)}</span>
+      &nbsp;•&nbsp; <span class="small">Expenses (excl. Savings): $${fmt(spendNonSavings)}</span>
+    `;
+  }
+
+  // Recompute on load, when the month title changes, and when page regains focus
+  document.addEventListener('DOMContentLoaded', renderSpendable);
+  window.addEventListener('focus', renderSpendable);
+
+  const titleEl = document.getElementById('monthTitle');
+  if (titleEl && 'MutationObserver' in window){
+    new MutationObserver(renderSpendable).observe(titleEl, { childList:true, characterData:true, subtree:true });
+  }
+
+  // Optional: expose for other code to call after edits
+  window.Budgeteer_refreshSummary = renderSpendable;
+})();
