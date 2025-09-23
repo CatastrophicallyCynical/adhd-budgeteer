@@ -29,8 +29,10 @@
 </nav>
 
 <script type="module">
+import { initAffirmations } from './affirmation.js';
 import { applyTheme } from './theme.js'; await applyTheme();
 import { idb } from './db.js';
+initAffirmations();
 await idb.open();
 document.getElementById('backBtn').onclick = ()=> history.back();
 
