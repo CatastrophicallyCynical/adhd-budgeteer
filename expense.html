@@ -57,14 +57,19 @@ const pre = new URLSearchParams(location.search).get('bucket'); if (pre) sel.val
 
 document.getElementById('cancel').onclick = ()=> history.back();
 document.getElementById('save').onclick = ()=>{
-  const amt = Number((document.getElementById('amount').value||'').trim());
-  if (!amt) { alert('Enter an amount (negative number for expense)'); return; }
+  const raw = (document.getElementById('amount').value||'').trim();
+  const amt = Number(raw);
+  if (!Number.isFinite(amt) || amt === 0) {
+    alert('Enter an amount (expenses are stored as negative numbers)');
+    return;
+  }
+  const amount = amt > 0 ? -Math.abs(amt) : amt;
   const date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
   const bucketId = sel.value;
   const note = document.getElementById('note').value || '';
 
   const all = load(LS_EXP, []);
-  all.push({ id: crypto.randomUUID(), amount: amt, bucketId, note, date });
+  all.push({ id: crypto.randomUUID(), amount, bucketId, note, date });
   save(LS_EXP, all);
   alert('Saved!');
   history.back();

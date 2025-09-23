@@ -12,7 +12,16 @@ On iPhone, open in Safari → Share → Add to Home Screen.
 - Generate Public VAPID in Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates.
 
 ## Push notifications
-This app requests permission and saves the FCM token in `localStorage` (`fcm_token`). The sample Cloud Function expects you to store tokens in Firestore under `users/{uid}` with `fcm_token` field (adapt as needed).
+Pages do **not** request push permission automatically. If you want reminders, import `firebase.js` on the page that configures notifications (for example `about.html`) and call `ensurePushPermission()` yourself:
+
+```html
+<script type="module">
+  import { ensurePushPermission } from './firebase.js';
+  ensurePushPermission();
+</script>
+```
+
+The helper stores the resolved FCM token in `localStorage` (`fcm_token`). The sample Cloud Function expects you to copy that token into Firestore under `users/{uid}` with an `fcm_token` field (adapt as needed).
 
 ## Cloud Functions (server/)
 Deploy the functions and then wire Cloud Scheduler to hit them at 12:00 PM America/Detroit.

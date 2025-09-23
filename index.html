@@ -9,7 +9,7 @@
 <script src="theme-apply.js"></script>
 <header>
   <div class="app-title">Budgeteer</div>
-  <div class="affirmation small">You’re doing enough. Then some.</div>
+  <div class="affirmation small"></div>
 </header>
 
 <div class="container">
@@ -49,5 +49,9 @@
 </nav>
 
 <script type="module" src="app.js"></script>
+<script type="module">
+  import { initAffirmations } from './affirmation.js';
+  initAffirmations();
+</script>
 </body>
 </html>

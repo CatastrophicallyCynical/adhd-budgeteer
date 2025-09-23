@@ -56,9 +56,9 @@
     <hr style="margin:12px 0">
 
     <div class="row" style="align-items:center; flex-wrap:wrap; gap:12px">
-      <div style="min-width:140px">Recurring confirms</div>
+      <div style="min-width:140px">Recurring confirmations</div>
       <label class="small" style="display:flex; align-items:center; gap:6px">
-        <input type="checkbox" id="confirmEnabled" checked> Ask “Yes / No”
+        <input type="checkbox" id="confirmEnabled" checked> Ask “Yes/No”
       </label>
     </div>
 
@@ -95,7 +95,7 @@
 
 <script src="notify.js"></script>
 <script>
-// Back + version
+// Back button + local data timestamp
 document.getElementById('backBtn').onclick = ()=> history.back();
 document.getElementById('ver').textContent = `Local data • ${new Date().toLocaleString()}`;
 
@@ -173,5 +173,9 @@ const api = window.__budgeteerNotify;
     alert('Saved!');
   };
 })();
+</script>
+<script type="module">
+  import { initAffirmations } from './affirmation.js';
+  initAffirmations();
 </script>
 </body></html>

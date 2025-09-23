@@ -127,8 +127,20 @@ function render(){
   });
 }
 
-document.getElementById('prev').onclick = ()=>{ if(--CUR_M<0){CUR_M=11;CUR_Y--;} render(); };
-document.getElementById('next').onclick = ()=>{ if(++CUR_M>11){CUR_M=0;CUR_Y++;} render(); };
+document.getElementById('prev').onclick = ()=>{
+  if(--CUR_M<0){CUR_M=11;CUR_Y--;}
+  render();
+  if (typeof window.Budgeteer_refreshSummary === 'function') {
+    window.Budgeteer_refreshSummary();
+  }
+};
+document.getElementById('next').onclick = ()=>{
+  if(++CUR_M>11){CUR_M=0;CUR_Y++;}
+  render();
+  if (typeof window.Budgeteer_refreshSummary === 'function') {
+    window.Budgeteer_refreshSummary();
+  }
+};
 
 (function init(){ render(); })();
 // ===== Spendable summary (Income - Expenses excluding Savings) =====
@@ -207,3 +219,20 @@ document.getElementById('next').onclick = ()=>{ if(++CUR_M>11){CUR_M=0;CUR_Y++;}
   // Optional: expose for other code to call after edits
   window.Budgeteer_refreshSummary = renderSpendable;
 })();
+
+function refreshHomeView(){
+  render();
+  if (typeof window.Budgeteer_refreshSummary === 'function') {
+    window.Budgeteer_refreshSummary();
+  }
+}
+
+window.addEventListener('pageshow', ()=>{
+  refreshHomeView();
+});
+
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden) {
+    refreshHomeView();
+  }
+});
