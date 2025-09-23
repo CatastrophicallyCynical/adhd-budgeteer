@@ -77,4 +77,37 @@ describe('makeSendToAll', () => {
       data: {},
     });
   });
+
+  it('returns failure details when messaging rejects', async () => {
+    const get = vi.fn(async () => snapshotWithTokens(['token']));
+    const messaging = {
+      sendEachForMulticast: vi.fn(async () => {
+        throw Object.assign(new Error('network down'), { code: 'unavailable' });
+      }),
+    };
+    const firestore = { collection: () => ({ get }) };
+
+    const sendToAll = makeSendToAll({ firestore, messaging });
+    const result = await sendToAll('Ping', 'Hello');
+
+    expect(result).toEqual({ ok: false, reason: 'network down' });
+  });
+
+  it('flags responses that include errors', async () => {
+    const get = vi.fn(async () => snapshotWithTokens(['token']));
+    const messaging = {
+      sendEachForMulticast: vi.fn(async () => ({
+        responses: [
+          { success: true },
+          { success: false, error: { message: 'invalid token' } },
+        ],
+      })),
+    };
+    const firestore = { collection: () => ({ get }) };
+
+    const sendToAll = makeSendToAll({ firestore, messaging });
+    const result = await sendToAll('Ping', 'Hello');
+
+    expect(result).toEqual({ ok: false, reason: 'invalid token' });
+  });
 });

@@ -24,12 +24,21 @@ export function makeSendToAll({ firestore, messaging }) {
       if (token) tokens.push(token);
     });
     if (!tokens.length) return { ok: false, reason: 'no tokens' };
-    const res = await messaging.sendEachForMulticast({
-      tokens,
-      notification: { title, body },
-      data,
-    });
-    return { ok: true, res: res.responses.length };
+    try {
+      const res = await messaging.sendEachForMulticast({
+        tokens,
+        notification: { title, body },
+        data,
+      });
+      const failures = (res.responses || []).filter(r => r && r.error);
+      if (failures.length) {
+        const first = failures[0].error;
+        return { ok: false, reason: first?.message || 'messaging failure' };
+      }
+      return { ok: true, res: (res.responses || []).length };
+    } catch (err) {
+      return { ok: false, reason: err?.message || 'messaging failure' };
+    }
   };
 }
 
