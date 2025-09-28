@@ -1,47 +1,52 @@
-/**
- * Minimal Cloud Functions for scheduling pushes.
- * - Store FCM tokens per user (simple demo uses 'users' collection)
- * - Scheduler hits endpoints to send: weekly reset, mid-week, daily nudges, and recurring confirmations.
- */
-const functions = require('firebase-functions/v2/https');
-const admin = require('firebase-admin');
-const { onRequest } = functions;
+require('dotenv').config();
 
-try { admin.initializeApp(); } catch(e){}
+const express = require('express');
+const webpush = require('web-push');
 
-const fcm = admin.messaging();
+const app = express();
+const PORT = process.env.PORT || 3333;
+const DEFAULT_PUBLIC_KEY = 'BAf1NArKW908JYRuw8FQr6deEFeqJEI3Vpjg2izq9dhnY2po5rxA_geyBS3INhHHJe1-1USABczT53jDSnwqvXM';
 
-async function sendToAll(title, body, data={}){
-  const snap = await admin.firestore().collection('users').get();
-  const tokens = [];
-  snap.forEach(doc=>{
-    const t = doc.get('fcm_token'); if (t) tokens.push(t);
-  });
-  if (!tokens.length) return { ok:false, reason:'no tokens' };
-  const res = await fcm.sendEachForMulticast({
-    tokens, notification: { title, body }, data
-  });
-  return { ok:true, res: res.responses.length };
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || DEFAULT_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const CONTACT = process.env.VAPID_CONTACT_EMAIL || 'support@example.com';
+const VAPID_SUBJECT = CONTACT.startsWith('mailto:') ? CONTACT : `mailto:${CONTACT}`;
+
+app.use(express.json({ limit: '100kb' }));
+
+if (!VAPID_PRIVATE_KEY) {
+  console.warn('[push] VAPID_PRIVATE_KEY is not set. Push delivery requests will be rejected.');
+} else {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 
-exports.weeklyReset = onRequest(async (req, res)=>{
-  const { ok, reason } = await sendToAll('Weekly reset', 'New week, new buckets. Want to roll leftovers forward?', { kind:'weekly_reset' });
-  res.json({ ok: ok || false, reason: reason || null });
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, message: 'Gentle Budget push relay online.' });
 });
 
-exports.midWeek = onRequest(async (req, res)=>{
-  const { ok, reason } = await sendToAll('Mid-week check', 'Halfway through the week. Quick peek at your buckets?', { kind:'mid_week' });
-  res.json({ ok: ok || false, reason: reason || null });
+app.post('/api/push', async (req, res) => {
+  if (!VAPID_PRIVATE_KEY) {
+    return res.status(500).json({ ok: false, error: 'VAPID private key missing on server.' });
+  }
+
+  const { subscription, payload, options } = req.body || {};
+  if (!subscription || typeof subscription !== 'object') {
+    return res.status(400).json({ ok: false, error: 'A push `subscription` object is required.' });
+  }
+
+  try {
+    const body = payload && typeof payload === 'object' ? JSON.stringify(payload) : payload ?? '';
+    await webpush.sendNotification(subscription, body, options);
+    res.status(202).json({ ok: true });
+  } catch (error) {
+    console.error('[push] Failed to send notification', error);
+    const status = error.statusCode && Number.isInteger(error.statusCode) ? error.statusCode : 500;
+    res.status(status).json({ ok: false, error: error.body || error.message || 'Unknown push error' });
+  }
 });
 
-exports.dailyNudge = onRequest(async (req, res)=>{
-  const { ok, reason } = await sendToAll('Money check', '2-min money check?', { kind:'daily' });
-  res.json({ ok: ok || false, reason: reason || null });
+app.listen(PORT, () => {
+  console.log(`[push] Listening on port ${PORT}`);
 });
 
-// Example recurring confirm (your scheduler would call this per due item with ID)
-exports.recurringConfirm = onRequest(async (req, res)=>{
-  const { name='Bill', recurringId='unknown' } = req.query;
-  const { ok, reason } = await sendToAll(`${name} — due today`, 'Looks like it should post around now. Did it happen?', { kind:'recurring', recurringId });
-  res.json({ ok: ok || false, reason: reason || null });
-});
+module.exports = app;
